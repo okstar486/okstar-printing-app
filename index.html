@@ -563,11 +563,12 @@
                         📸 완성된 앞판 이미지
                     </div>
                     <div style="padding: 20px;">
-                        <input type="file" id="completeFrontInput" accept="image/*">
+                        <input type="file" id="completeFrontInput" accept="image/*" multiple>
                         <label for="completeFrontInput" class="upload-label" id="completeFrontLabel">
                             📸 완성된 앞판<br>
-                            <small>이미 디자인이 적용된 앞판</small>
+                            <small>여러 개 선택 가능</small>
                         </label>
+                        <div class="file-list" id="completeFrontList"></div>
                     </div>
                 </div>
 
@@ -576,12 +577,27 @@
                         📸 완성된 뒷판 이미지
                     </div>
                     <div style="padding: 20px;">
-                        <input type="file" id="completeBackInput" accept="image/*">
+                        <input type="file" id="completeBackInput" accept="image/*" multiple>
                         <label for="completeBackInput" class="upload-label" id="completeBackLabel">
                             📸 완성된 뒷판<br>
-                            <small>이미 디자인이 적용된 뒷판</small>
+                            <small>여러 개 선택 가능</small>
                         </label>
+                        <div class="file-list" id="completeBackList"></div>
                     </div>
+                </div>
+            </div>
+
+            <!-- 세트 선택 탭 -->
+            <div class="tab-navigation" id="combineTabs">
+                <span style="color: #94a3b8; padding: 6px;">앞판과 뒷판 이미지를 업로드하면 세트별 탭이 표시됩니다</span>
+            </div>
+
+            <!-- 일괄 설정 버튼 -->
+            <div style="text-align: center; margin: 20px 0;">
+                <div style="display: inline-block; background: #fef3c7; padding: 10px 15px; border-radius: 8px; margin-right: 10px;">
+                    <button id="applyToAllBtn" style="padding: 6px 12px; background: #f59e0b; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                        ⚙️ 현재 설정을 모든 세트에 적용
+                    </button>
                 </div>
             </div>
 
@@ -600,7 +616,7 @@
 
             <div class="canvas-container single">
                 <div class="canvas-section">
-                    <div class="canvas-title" style="color: #f59e0b;">🎨 합성 미리보기 (겹침 모드)</div>
+                    <div class="canvas-title" style="color: #f59e0b;">🎨 합성 미리보기 - 세트 <span id="currentSetNumber">1</span>/<span id="totalSetNumber">1</span></div>
                     <canvas id="combineCanvas" style="background: #f8f8f8;"></canvas>
                     <div class="controls">
                         <div class="control-group">
@@ -1219,80 +1235,220 @@
             renderFB();
         }
 
-        // Mode 3: 완성본 합성 초기화 (겹침 모드)
+        // Mode 3: 완성본 합성 초기화 (대량 처리 버전)
         function initMode3() {
             const canvas = document.getElementById('combineCanvas');
             const ctx = canvas.getContext('2d');
             canvas.width = 800;
             canvas.height = 800;
             
-            // 상태 관리
+            // 상태 관리 - 여러 세트 관리
             const combineState = {
-                frontImage: null,
-                backImage: null,
-                frontPosition: { x: canvas.width / 2, y: canvas.height / 2 },
-                backPosition: { x: canvas.width / 2, y: canvas.height / 2 },
-                frontScale: 0.5,
-                backScale: 1.0,
-                layerOrder: 'front', // 'front' or 'back' - 어느것이 위에 올지
-                opacity: 1.0,
-                dragging: null, // 현재 드래그중인 이미지
+                frontImages: [],  // 여러 앞판
+                backImages: [],   // 여러 뒷판
+                currentIndex: 0,  // 현재 선택된 세트
+                sets: [],         // 각 세트별 설정 저장
+                globalSettings: { // 전체 적용할 기본 설정
+                    layerOrder: 'front',
+                    opacity: 1.0
+                },
+                dragging: null,
                 dragStart: { x: 0, y: 0 }
             };
             
-            // 파일 업로드
-            document.getElementById('completeFrontInput').addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        combineState.frontImage = img;
-                        appState.modes.combine.frontImage = img;
-                        renderCombine();
-                        updateSaveButton();
+            // 세트별 설정 초기화
+            function initializeSet(index) {
+                if (!combineState.sets[index]) {
+                    combineState.sets[index] = {
+                        frontPosition: { x: canvas.width / 2, y: canvas.height / 2 },
+                        backPosition: { x: canvas.width / 2, y: canvas.height / 2 },
+                        frontScale: 0.5,
+                        backScale: 1.0,
+                        layerOrder: combineState.globalSettings.layerOrder,
+                        opacity: combineState.globalSettings.opacity
                     };
-                    img.src = event.target.result;
-                };
-                reader.readAsDataURL(file);
+                }
+                return combineState.sets[index];
+            }
+            
+            // 앞판 파일 업로드 (여러 개)
+            document.getElementById('completeFrontInput').addEventListener('change', (e) => {
+                const files = Array.from(e.target.files);
+                combineState.frontImages = [];
+                combineState.sets = [];
+                combineState.currentIndex = 0;
+                
+                let loadedCount = 0;
+                files.forEach((file, index) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            combineState.frontImages[index] = {
+                                name: file.name.split('.')[0],
+                                image: img
+                            };
+                            
+                            loadedCount++;
+                            if (loadedCount === files.length) {
+                                updateCombineTabs();
+                                updateCombineFileList('front');
+                                renderCombine();
+                                updateSaveButton();
+                            }
+                        };
+                        img.src = event.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
                 
                 document.getElementById('completeFrontLabel').classList.add('uploaded');
-                document.getElementById('completeFrontLabel').innerHTML = `✅ 앞판<br><small>${file.name}</small>`;
+                document.getElementById('completeFrontLabel').innerHTML = `✅ 앞판 ${files.length}개<br><small>업로드 완료</small>`;
             });
             
+            // 뒷판 파일 업로드 (여러 개)
             document.getElementById('completeBackInput').addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
+                const files = Array.from(e.target.files);
+                combineState.backImages = [];
                 
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        combineState.backImage = img;
-                        appState.modes.combine.backImage = img;
-                        renderCombine();
-                        updateSaveButton();
+                let loadedCount = 0;
+                files.forEach((file, index) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            combineState.backImages[index] = {
+                                name: file.name.split('.')[0],
+                                image: img
+                            };
+                            
+                            loadedCount++;
+                            if (loadedCount === files.length) {
+                                updateCombineTabs();
+                                updateCombineFileList('back');
+                                renderCombine();
+                                updateSaveButton();
+                            }
+                        };
+                        img.src = event.target.result;
                     };
-                    img.src = event.target.result;
-                };
-                reader.readAsDataURL(file);
+                    reader.readAsDataURL(file);
+                });
                 
                 document.getElementById('completeBackLabel').classList.add('uploaded');
-                document.getElementById('completeBackLabel').innerHTML = `✅ 뒷판<br><small>${file.name}</small>`;
+                document.getElementById('completeBackLabel').innerHTML = `✅ 뒷판 ${files.length}개<br><small>업로드 완료</small>`;
+            });
+            
+            // 탭 업데이트
+            function updateCombineTabs() {
+                const tabs = document.getElementById('combineTabs');
+                const frontCount = combineState.frontImages.length;
+                const backCount = combineState.backImages.length;
+                const maxCount = Math.min(frontCount, backCount);
+                
+                tabs.innerHTML = '';
+                
+                if (maxCount === 0) {
+                    tabs.innerHTML = '<span style="color: #94a3b8; padding: 6px;">앞판과 뒷판 이미지를 업로드하면 세트별 탭이 표시됩니다</span>';
+                    document.getElementById('currentSetNumber').textContent = '0';
+                    document.getElementById('totalSetNumber').textContent = '0';
+                    return;
+                }
+                
+                for (let i = 0; i < maxCount; i++) {
+                    const button = document.createElement('button');
+                    button.className = 'tab-button';
+                    button.textContent = `세트 ${i + 1}`;
+                    
+                    if (i === combineState.currentIndex) {
+                        button.classList.add('active');
+                    }
+                    
+                    button.addEventListener('click', () => {
+                        combineState.currentIndex = i;
+                        updateCombineTabs();
+                        renderCombine();
+                        updateControlsFromSet();
+                    });
+                    
+                    tabs.appendChild(button);
+                }
+                
+                document.getElementById('currentSetNumber').textContent = combineState.currentIndex + 1;
+                document.getElementById('totalSetNumber').textContent = maxCount;
+            }
+            
+            // 파일 리스트 업데이트
+            function updateCombineFileList(side) {
+                const listId = side === 'front' ? 'completeFrontList' : 'completeBackList';
+                const list = document.getElementById(listId);
+                const images = side === 'front' ? combineState.frontImages : combineState.backImages;
+                
+                list.innerHTML = '';
+                images.forEach(img => {
+                    const item = document.createElement('div');
+                    item.className = 'file-item';
+                    item.textContent = img.name;
+                    list.appendChild(item);
+                });
+            }
+            
+            // 현재 세트 설정으로 컨트롤 업데이트
+            function updateControlsFromSet() {
+                const currentSet = initializeSet(combineState.currentIndex);
+                
+                document.getElementById('combineFrontScale').value = currentSet.frontScale * 100;
+                document.getElementById('combineFrontScaleValue').textContent = Math.round(currentSet.frontScale * 100) + '%';
+                
+                document.getElementById('combineBackScale').value = currentSet.backScale * 100;
+                document.getElementById('combineBackScaleValue').textContent = Math.round(currentSet.backScale * 100) + '%';
+                
+                document.getElementById('combineOpacity').value = currentSet.opacity * 100;
+                document.getElementById('combineOpacityValue').textContent = Math.round(currentSet.opacity * 100) + '%';
+                
+                // 레이어 순서 버튼 업데이트
+                if (currentSet.layerOrder === 'front') {
+                    document.getElementById('layerFrontBtn').classList.add('active');
+                    document.getElementById('layerBackBtn').classList.remove('active');
+                } else {
+                    document.getElementById('layerBackBtn').classList.add('active');
+                    document.getElementById('layerFrontBtn').classList.remove('active');
+                }
+            }
+            
+            // 모든 세트에 현재 설정 적용
+            document.getElementById('applyToAllBtn').addEventListener('click', () => {
+                const currentSet = initializeSet(combineState.currentIndex);
+                const maxCount = Math.min(combineState.frontImages.length, combineState.backImages.length);
+                
+                for (let i = 0; i < maxCount; i++) {
+                    if (i !== combineState.currentIndex) {
+                        combineState.sets[i] = {
+                            frontPosition: { ...currentSet.frontPosition },
+                            backPosition: { ...currentSet.backPosition },
+                            frontScale: currentSet.frontScale,
+                            backScale: currentSet.backScale,
+                            layerOrder: currentSet.layerOrder,
+                            opacity: currentSet.opacity
+                        };
+                    }
+                }
+                
+                alert(`현재 설정이 ${maxCount}개 세트 모두에 적용되었습니다!`);
             });
             
             // 레이어 순서 버튼
             document.getElementById('layerFrontBtn').addEventListener('click', () => {
-                combineState.layerOrder = 'front';
+                const currentSet = initializeSet(combineState.currentIndex);
+                currentSet.layerOrder = 'front';
                 document.getElementById('layerFrontBtn').classList.add('active');
                 document.getElementById('layerBackBtn').classList.remove('active');
                 renderCombine();
             });
             
             document.getElementById('layerBackBtn').addEventListener('click', () => {
-                combineState.layerOrder = 'back';
+                const currentSet = initializeSet(combineState.currentIndex);
+                currentSet.layerOrder = 'back';
                 document.getElementById('layerBackBtn').classList.add('active');
                 document.getElementById('layerFrontBtn').classList.remove('active');
                 renderCombine();
@@ -1300,20 +1456,23 @@
             
             // 투명도 조절
             document.getElementById('combineOpacity').addEventListener('input', (e) => {
-                combineState.opacity = e.target.value / 100;
+                const currentSet = initializeSet(combineState.currentIndex);
+                currentSet.opacity = e.target.value / 100;
                 document.getElementById('combineOpacityValue').textContent = e.target.value + '%';
                 renderCombine();
             });
             
             // 스케일 조절
             document.getElementById('combineFrontScale').addEventListener('input', (e) => {
-                combineState.frontScale = e.target.value / 100;
+                const currentSet = initializeSet(combineState.currentIndex);
+                currentSet.frontScale = e.target.value / 100;
                 document.getElementById('combineFrontScaleValue').textContent = e.target.value + '%';
                 renderCombine();
             });
             
             document.getElementById('combineBackScale').addEventListener('input', (e) => {
-                combineState.backScale = e.target.value / 100;
+                const currentSet = initializeSet(combineState.currentIndex);
+                currentSet.backScale = e.target.value / 100;
                 document.getElementById('combineBackScaleValue').textContent = e.target.value + '%';
                 renderCombine();
             });
@@ -1324,24 +1483,25 @@
                 const x = (e.clientX - rect.left) * (canvas.width / rect.width);
                 const y = (e.clientY - rect.top) * (canvas.height / rect.height);
                 
-                // 어느 이미지를 클릭했는지 확인 (위에 있는 것부터 체크)
-                if (combineState.layerOrder === 'front') {
-                    // 앞판이 위에 있을 때
-                    if (isInsideImage(x, y, combineState.frontImage, combineState.frontPosition, combineState.frontScale)) {
+                const currentSet = initializeSet(combineState.currentIndex);
+                const frontImg = combineState.frontImages[combineState.currentIndex];
+                const backImg = combineState.backImages[combineState.currentIndex];
+                
+                if (currentSet.layerOrder === 'front') {
+                    if (isInsideImage(x, y, frontImg?.image, currentSet.frontPosition, currentSet.frontScale)) {
                         combineState.dragging = 'front';
-                        combineState.dragStart = { x: x - combineState.frontPosition.x, y: y - combineState.frontPosition.y };
-                    } else if (isInsideImage(x, y, combineState.backImage, combineState.backPosition, combineState.backScale)) {
+                        combineState.dragStart = { x: x - currentSet.frontPosition.x, y: y - currentSet.frontPosition.y };
+                    } else if (isInsideImage(x, y, backImg?.image, currentSet.backPosition, currentSet.backScale)) {
                         combineState.dragging = 'back';
-                        combineState.dragStart = { x: x - combineState.backPosition.x, y: y - combineState.backPosition.y };
+                        combineState.dragStart = { x: x - currentSet.backPosition.x, y: y - currentSet.backPosition.y };
                     }
                 } else {
-                    // 뒷판이 위에 있을 때
-                    if (isInsideImage(x, y, combineState.backImage, combineState.backPosition, combineState.backScale)) {
+                    if (isInsideImage(x, y, backImg?.image, currentSet.backPosition, currentSet.backScale)) {
                         combineState.dragging = 'back';
-                        combineState.dragStart = { x: x - combineState.backPosition.x, y: y - combineState.backPosition.y };
-                    } else if (isInsideImage(x, y, combineState.frontImage, combineState.frontPosition, combineState.frontScale)) {
+                        combineState.dragStart = { x: x - currentSet.backPosition.x, y: y - currentSet.backPosition.y };
+                    } else if (isInsideImage(x, y, frontImg?.image, currentSet.frontPosition, currentSet.frontScale)) {
                         combineState.dragging = 'front';
-                        combineState.dragStart = { x: x - combineState.frontPosition.x, y: y - combineState.frontPosition.y };
+                        combineState.dragStart = { x: x - currentSet.frontPosition.x, y: y - currentSet.frontPosition.y };
                     }
                 }
                 
@@ -1351,14 +1511,18 @@
             });
             
             canvas.addEventListener('mousemove', (e) => {
+                const currentSet = initializeSet(combineState.currentIndex);
+                
                 if (!combineState.dragging) {
-                    // 호버 시 커서 변경
                     const rect = canvas.getBoundingClientRect();
                     const x = (e.clientX - rect.left) * (canvas.width / rect.width);
                     const y = (e.clientY - rect.top) * (canvas.height / rect.height);
                     
-                    if (isInsideImage(x, y, combineState.frontImage, combineState.frontPosition, combineState.frontScale) ||
-                        isInsideImage(x, y, combineState.backImage, combineState.backPosition, combineState.backScale)) {
+                    const frontImg = combineState.frontImages[combineState.currentIndex];
+                    const backImg = combineState.backImages[combineState.currentIndex];
+                    
+                    if (isInsideImage(x, y, frontImg?.image, currentSet.frontPosition, currentSet.frontScale) ||
+                        isInsideImage(x, y, backImg?.image, currentSet.backPosition, currentSet.backScale)) {
                         canvas.style.cursor = 'grab';
                     } else {
                         canvas.style.cursor = 'default';
@@ -1371,11 +1535,11 @@
                 const y = (e.clientY - rect.top) * (canvas.height / rect.height);
                 
                 if (combineState.dragging === 'front') {
-                    combineState.frontPosition.x = x - combineState.dragStart.x;
-                    combineState.frontPosition.y = y - combineState.dragStart.y;
+                    currentSet.frontPosition.x = x - combineState.dragStart.x;
+                    currentSet.frontPosition.y = y - combineState.dragStart.y;
                 } else if (combineState.dragging === 'back') {
-                    combineState.backPosition.x = x - combineState.dragStart.x;
-                    combineState.backPosition.y = y - combineState.dragStart.y;
+                    currentSet.backPosition.x = x - combineState.dragStart.x;
+                    currentSet.backPosition.y = y - combineState.dragStart.y;
                 }
                 
                 renderCombine();
@@ -1386,12 +1550,7 @@
                 canvas.style.cursor = 'default';
             });
             
-            canvas.addEventListener('mouseleave', () => {
-                combineState.dragging = null;
-                canvas.style.cursor = 'default';
-            });
-            
-            // 이미지 내부 클릭 체크 함수
+            // 이미지 내부 클릭 체크
             function isInsideImage(x, y, image, position, scale) {
                 if (!image) return false;
                 
@@ -1406,7 +1565,7 @@
             function renderCombine() {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 
-                // 배경 (체크패턴으로 투명도 확인 가능)
+                // 체크패턴 배경
                 const checkSize = 20;
                 for (let i = 0; i < canvas.width; i += checkSize) {
                     for (let j = 0; j < canvas.height; j += checkSize) {
@@ -1415,39 +1574,27 @@
                     }
                 }
                 
-                // 레이어 순서에 따라 그리기
-                if (combineState.layerOrder === 'front') {
-                    // 뒷판 먼저, 앞판 나중에
-                    drawImage(combineState.backImage, combineState.backPosition, combineState.backScale);
-                    drawImage(combineState.frontImage, combineState.frontPosition, combineState.frontScale);
-                } else {
-                    // 앞판 먼저, 뒷판 나중에
-                    drawImage(combineState.frontImage, combineState.frontPosition, combineState.frontScale);
-                    drawImage(combineState.backImage, combineState.backPosition, combineState.backScale);
-                }
+                const currentSet = initializeSet(combineState.currentIndex);
+                const frontImg = combineState.frontImages[combineState.currentIndex];
+                const backImg = combineState.backImages[combineState.currentIndex];
                 
-                // 가이드라인 (선택사항)
-                if (combineState.dragging) {
-                    ctx.strokeStyle = 'rgba(59, 130, 246, 0.5)';
-                    ctx.lineWidth = 1;
-                    ctx.setLineDash([5, 5]);
-                    
-                    // 중심선
-                    ctx.beginPath();
-                    ctx.moveTo(canvas.width / 2, 0);
-                    ctx.lineTo(canvas.width / 2, canvas.height);
-                    ctx.moveTo(0, canvas.height / 2);
-                    ctx.lineTo(canvas.width, canvas.height / 2);
-                    ctx.stroke();
-                    ctx.setLineDash([]);
+                if (!frontImg || !backImg) return;
+                
+                // 레이어 순서에 따라 그리기
+                if (currentSet.layerOrder === 'front') {
+                    drawImage(backImg.image, currentSet.backPosition, currentSet.backScale, currentSet.opacity);
+                    drawImage(frontImg.image, currentSet.frontPosition, currentSet.frontScale, currentSet.opacity);
+                } else {
+                    drawImage(frontImg.image, currentSet.frontPosition, currentSet.frontScale, currentSet.opacity);
+                    drawImage(backImg.image, currentSet.backPosition, currentSet.backScale, currentSet.opacity);
                 }
             }
             
-            function drawImage(image, position, scale) {
+            function drawImage(image, position, scale, opacity) {
                 if (!image) return;
                 
                 ctx.save();
-                ctx.globalAlpha = combineState.opacity;
+                ctx.globalAlpha = opacity;
                 
                 const width = image.width * scale * 0.5;
                 const height = image.height * scale * 0.5;
@@ -1458,28 +1605,79 @@
                 ctx.restore();
             }
             
-            // 저장 함수
+            // 대량 저장 함수
             window.saveMode3 = async function() {
-                // 저장용 캔버스 (투명도 100%로)
-                const saveCanvas = document.createElement('canvas');
-                const saveCtx = saveCanvas.getContext('2d');
-                saveCanvas.width = canvas.width;
-                saveCanvas.height = canvas.height;
+                const maxCount = Math.min(combineState.frontImages.length, combineState.backImages.length);
+                const files = [];
                 
-                // 흰 배경
-                saveCtx.fillStyle = '#ffffff';
-                saveCtx.fillRect(0, 0, saveCanvas.width, saveCanvas.height);
-                
-                // 레이어 순서대로 그리기
-                if (combineState.layerOrder === 'front') {
-                    drawImageToCanvas(saveCtx, combineState.backImage, combineState.backPosition, combineState.backScale);
-                    drawImageToCanvas(saveCtx, combineState.frontImage, combineState.frontPosition, combineState.frontScale);
-                } else {
-                    drawImageToCanvas(saveCtx, combineState.frontImage, combineState.frontPosition, combineState.frontScale);
-                    drawImageToCanvas(saveCtx, combineState.backImage, combineState.backPosition, combineState.backScale);
+                for (let i = 0; i < maxCount; i++) {
+                    const currentSet = initializeSet(i);
+                    const frontImg = combineState.frontImages[i];
+                    const backImg = combineState.backImages[i];
+                    
+                    if (!frontImg || !backImg) continue;
+                    
+                    // 각 세트별로 캔버스 생성
+                    const saveCanvas = document.createElement('canvas');
+                    const saveCtx = saveCanvas.getContext('2d');
+                    saveCanvas.width = canvas.width;
+                    saveCanvas.height = canvas.height;
+                    
+                    // 흰 배경
+                    saveCtx.fillStyle = '#ffffff';
+                    saveCtx.fillRect(0, 0, saveCanvas.width, saveCanvas.height);
+                    
+                    // 레이어 순서대로 그리기
+                    if (currentSet.layerOrder === 'front') {
+                        drawToCanvas(saveCtx, backImg.image, currentSet.backPosition, currentSet.backScale);
+                        drawToCanvas(saveCtx, frontImg.image, currentSet.frontPosition, currentSet.frontScale);
+                    } else {
+                        drawToCanvas(saveCtx, frontImg.image, currentSet.frontPosition, currentSet.frontScale);
+                        drawToCanvas(saveCtx, backImg.image, currentSet.backPosition, currentSet.backScale);
+                    }
+                    
+                    const blob = await new Promise(resolve => {
+                        saveCanvas.toBlob(resolve, 'image/png', 1.0);
+                    });
+                    
+                    files.push({
+                        name: `combined_set_${i + 1}_OKSTAR.png`,
+                        blob
+                    });
                 }
                 
-                function drawImageToCanvas(ctx, image, position, scale) {
+                // ZIP으로 다운로드
+                if (files.length > 1) {
+                    const zip = new JSZip();
+                    const folder = zip.folder('OKSTAR_Combined_Output');
+                    
+                    files.forEach(file => {
+                        folder.file(file.name, file.blob);
+                    });
+                    
+                    const content = await zip.generateAsync({
+                        type: 'blob',
+                        compression: 'DEFLATE',
+                        compressionOptions: { level: 6 }
+                    });
+                    
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(content);
+                    a.download = `OKSTAR_combined_all_${Date.now()}.zip`;
+                    a.click();
+                    
+                    showSaveSuccess(`${files.length}개 세트 저장 완료!`);
+                } else if (files.length === 1) {
+                    // 파일이 1개면 ZIP 없이 저장
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(files[0].blob);
+                    a.download = files[0].name;
+                    a.click();
+                    
+                    showSaveSuccess('합성 이미지 저장 완료!');
+                }
+                
+                function drawToCanvas(ctx, image, position, scale) {
                     if (!image) return;
                     const width = image.width * scale * 0.5;
                     const height = image.height * scale * 0.5;
@@ -1487,21 +1685,13 @@
                     const y = position.y - height / 2;
                     ctx.drawImage(image, x, y, width, height);
                 }
-                
-                const blob = await new Promise(resolve => {
-                    saveCanvas.toBlob(resolve, 'image/png', 1.0);
-                });
-                
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = `OKSTAR_combined_${Date.now()}.png`;
-                a.click();
-                
-                showSaveSuccess('합성 이미지 저장 완료!');
             };
             
             // 초기 렌더링
             renderCombine();
+            
+            // appState 업데이트
+            appState.modes.combine = combineState;
         }
 
         // 드래그 설정 헬퍼
@@ -1632,9 +1822,15 @@
                     text = `📦 ${count}개 앞뒤 세트 저장`;
                 }
             } else if (appState.currentMode === 'combine') {
-                if (appState.modes.combine.frontImage && appState.modes.combine.backImage) {
-                    ready = true;
-                    text = '🎨 합성 이미지 저장';
+                if (appState.modes.combine && appState.modes.combine.frontImages && appState.modes.combine.backImages) {
+                    const frontCount = appState.modes.combine.frontImages.length;
+                    const backCount = appState.modes.combine.backImages.length;
+                    
+                    if (frontCount > 0 && backCount > 0) {
+                        ready = true;
+                        const setCount = Math.min(frontCount, backCount);
+                        text = setCount > 1 ? `🎨 ${setCount}개 세트 합성 저장` : '🎨 합성 이미지 저장';
+                    }
                 }
             }
             
