@@ -428,6 +428,13 @@
             <span id="modeInstruction">1️⃣ 앞판 무지 티셔츠 업로드 2️⃣ 앞판 디자인 배치 3️⃣ 저장 → 색상별 자동 저장!</span>
         </div>
 
+        <!-- 픽셀 크기 설정 -->
+        <div style="text-align: center; margin: 15px 0;">
+            <button id="pixelSizeBtn" style="padding: 8px 16px; background: #6366f1; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                📐 출력 크기 변경 (현재: 1500px)
+            </button>
+        </div>
+
         <!-- Mode 1: 앞판 전용 -->
         <div id="frontMode" class="mode-content active">
             <div class="upload-grid single">
@@ -634,11 +641,21 @@
             </div>
         </div>
 
-        <!-- 저장 버튼 -->
-        <button id="saveBtn" class="save-button" disabled>
-            <span>📦</span>
-            <span id="saveBtnText">파일을 업로드하세요</span>
-        </button>
+        <!-- 파일명 설정 및 저장 버튼 -->
+        <div style="margin: 20px 0;">
+            <div style="text-align: center; margin-bottom: 10px;">
+                <label style="margin-right: 10px; font-weight: bold;">파일명:</label>
+                <input type="text" id="filenameInput" placeholder="okstar" value="okstar" 
+                       style="padding: 8px; border: 2px solid #e2e8f0; border-radius: 6px; width: 200px;">
+                <span id="filenameHint" style="margin-left: 10px; color: #6b7280; font-size: 12px;">
+                    예시: okstar-01-front.png
+                </span>
+            </div>
+            <button id="saveBtn" class="save-button" disabled>
+                <span>📦</span>
+                <span id="saveBtnText">파일을 업로드하세요</span>
+            </button>
+        </div>
 
         <div class="footer">
             <div style="font-size: 14px; font-weight: bold; color: #4F46E5; margin-bottom: 5px;">
@@ -657,6 +674,14 @@
         console.log('🎨 옥스타 프린팅 프로그램 v4.0 시작');
         console.log('© 2024 OKSTAR KOREA COMPANY');
 
+        // 전역 설정
+        let outputWidth = 1500;
+        let outputHeight = 1500;
+        
+        // 실행취소 스택
+        const undoStack = [];
+        const maxUndoStack = 10;
+
         // 전역 상태 관리
         const appState = {
             currentMode: 'front',
@@ -673,10 +698,77 @@
         // 초기화
         document.addEventListener('DOMContentLoaded', () => {
             initModeSelector();
+            initPixelSizeControl();
+            initFilenameControl();
             initMode1();  // 앞판 전용
             initMode2();  // 앞판+뒷판
             initMode3();  // 완성본 합성
+            initUndoSystem();
         });
+
+        // 픽셀 크기 설정 초기화
+        function initPixelSizeControl() {
+            const pixelBtn = document.getElementById('pixelSizeBtn');
+            pixelBtn.addEventListener('click', () => {
+                const width = prompt('가로 크기를 입력하세요 (px):', outputWidth);
+                const height = prompt('세로 크기를 입력하세요 (px):', outputHeight);
+                
+                if (width && height && !isNaN(width) && !isNaN(height)) {
+                    outputWidth = parseInt(width);
+                    outputHeight = parseInt(height);
+                    pixelBtn.textContent = `📐 출력 크기 변경 (현재: ${outputWidth}x${outputHeight}px)`;
+                }
+            });
+        }
+
+        // 파일명 컨트롤 초기화
+        function initFilenameControl() {
+            const filenameInput = document.getElementById('filenameInput');
+            const filenameHint = document.getElementById('filenameHint');
+            
+            // 모드에 따라 힌트 변경
+            window.updateFilenameHint = function(mode) {
+                if (mode === 'front') {
+                    filenameHint.textContent = '예시: okstar-01.png';
+                } else if (mode === 'frontback') {
+                    filenameHint.textContent = '예시: okstar-01-front.png, okstar-01-back.png';
+                } else if (mode === 'combine') {
+                    filenameHint.textContent = '예시: okstar-01-combined.png';
+                }
+            };
+        }
+
+        // 실행취소 시스템
+        function initUndoSystem() {
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.key === 'z') {
+                    e.preventDefault();
+                    performUndo();
+                }
+            });
+        }
+
+        // 상태 저장 (실행취소용)
+        function saveState(description) {
+            const state = {
+                description,
+                mode: appState.currentMode,
+                data: JSON.parse(JSON.stringify(appState))
+            };
+            undoStack.push(state);
+            if (undoStack.length > maxUndoStack) {
+                undoStack.shift();
+            }
+        }
+
+        // 실행취소
+        function performUndo() {
+            if (undoStack.length > 0) {
+                const prevState = undoStack.pop();
+                // 상태 복원 로직
+                console.log('실행취소:', prevState.description);
+            }
+        }
 
         // 모드 선택 초기화
         function initModeSelector() {
