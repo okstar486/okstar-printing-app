@@ -646,6 +646,17 @@
                         <option value="4">4x</option>
                         <option value="5">5x</option>
                     </select>
+                    
+                    <!-- 위치 조절 추가 -->
+                    <div style="margin-top: 10px;">
+                        <span style="font-weight: bold;">확대컷 위치:</span>
+                        <span style="margin-left: 10px;">가로:</span>
+                        <input type="range" id="frontZoomX" min="0" max="100" value="85" style="width: 100px;">
+                        <span id="frontZoomXValue">85%</span>
+                        <span style="margin-left: 20px;">세로:</span>
+                        <input type="range" id="frontZoomY" min="0" max="100" value="70" style="width: 100px;">
+                        <span id="frontZoomYValue">70%</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1429,6 +1440,15 @@
             let zoomArea = null;
             let zoomLevel = 3;
             let selectingZoomArea = false;
+            let isSelectingArea = false;
+            let selectionStart = null;
+            let selectionEnd = null;
+            let zoomPositionX = 85; // 가로 위치 %
+            let zoomPositionY = 70; // 세로 위치 %
+            
+            // 원본 이미지 저장용
+            let designOriginal = null;
+            let tshirtOriginal = null;
             
             // 디테일 확대 체크박스
             document.getElementById('frontAddDetailZoom').addEventListener('change', (e) => {
@@ -1441,11 +1461,24 @@
                 renderFront();
             });
             
+            // 위치 조절 슬라이더
+            document.getElementById('frontZoomX').addEventListener('input', (e) => {
+                zoomPositionX = parseInt(e.target.value);
+                document.getElementById('frontZoomXValue').textContent = zoomPositionX + '%';
+                renderFront();
+            });
+            
+            document.getElementById('frontZoomY').addEventListener('input', (e) => {
+                zoomPositionY = parseInt(e.target.value);
+                document.getElementById('frontZoomYValue').textContent = zoomPositionY + '%';
+                renderFront();
+            });
+            
             // 영역 선택 버튼
             document.getElementById('frontSelectZoomArea').addEventListener('click', () => {
-                selectingZoomArea = true;
+                isSelectingArea = true;
                 canvas.style.cursor = 'crosshair';
-                alert('확대할 영역의 중심을 클릭하세요');
+                alert('확대할 영역을 드래그로 선택하세요');
             });
             
             // 파일 업로드
@@ -1464,6 +1497,11 @@
                                 name: file.name.split('.')[0],
                                 image: img
                             });
+                            
+                            // 첫 번째 티셔츠를 원본으로 저장
+                            if (loadedCount === 0) {
+                                tshirtOriginal = img;
+                            }
                             
                             loadedCount++;
                             if (loadedCount === files.length) {
@@ -1491,6 +1529,7 @@
                     const img = new Image();
                     img.onload = () => {
                         appState.modes.front.design = img;
+                        designOriginal = img; // 원본 이미지 저장
                         renderFront();
                         updateSaveButton();
                     };
@@ -1515,12 +1554,10 @@
                 const x = (e.clientX - rect.left) * (canvas.width / rect.width);
                 const y = (e.clientY - rect.top) * (canvas.height / rect.height);
                 
-                // 확대 영역 선택 모드
-                if (selectingZoomArea) {
-                    zoomArea = { x, y };
-                    selectingZoomArea = false;
-                    canvas.style.cursor = 'move';
-                    renderFront();
+                // 영역 선택 모드
+                if (isSelectingArea) {
+                    selectionStart = { x, y };
+                    selectionEnd = { x, y };
                     return;
                 }
                 
@@ -1539,11 +1576,18 @@
             });
             
             canvas.addEventListener('mousemove', (e) => {
-                if (!isDragging) return;
-                
                 const rect = canvas.getBoundingClientRect();
                 const x = (e.clientX - rect.left) * (canvas.width / rect.width);
                 const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+                
+                // 영역 선택 중
+                if (isSelectingArea && selectionStart) {
+                    selectionEnd = { x, y };
+                    renderFront();
+                    return;
+                }
+                
+                if (!isDragging) return;
                 
                 designPosition.x += x - dragStart.x;
                 designPosition.y += y - dragStart.y;
@@ -1551,9 +1595,25 @@
                 renderFront();
             });
             
-            canvas.addEventListener('mouseup', () => {
-                isDragging = false;
-                canvas.style.cursor = 'move';
+            canvas.addEventListener('mouseup', (e) => {
+                if (isSelectingArea && selectionStart && selectionEnd) {
+                    // 선택 영역 저장
+                    zoomArea = {
+                        x: Math.min(selectionStart.x, selectionEnd.x),
+                        y: Math.min(selectionStart.y, selectionEnd.y),
+                        width: Math.abs(selectionEnd.x - selectionStart.x),
+                        height: Math.abs(selectionEnd.y - selectionStart.y)
+                    };
+                    
+                    isSelectingArea = false;
+                    selectionStart = null;
+                    selectionEnd = null;
+                    canvas.style.cursor = 'move';
+                    renderFront();
+                } else {
+                    isDragging = false;
+                    canvas.style.cursor = 'move';
+                }
             });
             
             // 렌더링 함수
@@ -1576,6 +1636,7 @@
                     const y = (canvas.height - height) / 2;
                     
                     ctx.drawImage(tshirt.image, x, y, width, height);
+                    tshirtOriginal = tshirt.image; // 현재 티셔츠를 원본으로 저장
                 }
                 
                 // 디자인
@@ -1595,43 +1656,31 @@
                     ctx.setLineDash([]);
                 }
                 
-                // 확대 영역 표시
-                if (addDetailZoom && zoomArea) {
-                    const zoomSourceSize = 100 / zoomLevel;
-                    
-                    // 선택 영역 표시
-                    ctx.strokeStyle = '#10b981';
+                // 선택 영역 표시 (드래그 중)
+                if (isSelectingArea && selectionStart && selectionEnd) {
+                    ctx.strokeStyle = '#f59e0b';
                     ctx.lineWidth = 2;
                     ctx.setLineDash([5, 5]);
-                    ctx.strokeRect(
-                        zoomArea.x - zoomSourceSize/2,
-                        zoomArea.y - zoomSourceSize/2,
-                        zoomSourceSize,
-                        zoomSourceSize
-                    );
+                    const width = selectionEnd.x - selectionStart.x;
+                    const height = selectionEnd.y - selectionStart.y;
+                    ctx.strokeRect(selectionStart.x, selectionStart.y, width, height);
+                    ctx.setLineDash([]);
+                }
+                
+                // 확대 영역 표시
+                if (addDetailZoom && zoomArea) {
+                    // 선택 영역 표시
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.strokeRect(zoomArea.x, zoomArea.y, zoomArea.width, zoomArea.height);
                     ctx.setLineDash([]);
                     
                     // 확대 미리보기 (우측 하단)
                     const zoomSize = 150;
-                    const zoomX = canvas.width - zoomSize - 20;
-                    const zoomY = canvas.height - zoomSize - 20;
                     
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.arc(zoomX + zoomSize/2, zoomY + zoomSize/2, zoomSize/2, 0, Math.PI * 2);
-                    ctx.clip();
-                    
-                    // 배경
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(zoomX, zoomY, zoomSize, zoomSize);
-                    
-                    // 티셔츠와 디자인을 임시 캔버스에 그리기
-                    const tempCanvas = document.createElement('canvas');
-                    tempCanvas.width = canvas.width;
-                    tempCanvas.height = canvas.height;
-                    const tempCtx = tempCanvas.getContext('2d');
-                    
-                    // 티셔츠 복사
+                    // 티셔츠 경계 계산 (미리보기용)
+                    let tshirtBounds = null;
                     if (tshirt && tshirt.image) {
                         const scale = Math.min(
                             canvas.width / tshirt.image.width,
@@ -1643,32 +1692,83 @@
                         const x = (canvas.width - width) / 2;
                         const y = (canvas.height - height) / 2;
                         
-                        tempCtx.drawImage(tshirt.image, x, y, width, height);
+                        tshirtBounds = { x, y, width, height };
                     }
                     
-                    // 디자인 복사
-                    if (appState.modes.front.design) {
-                        const width = appState.modes.front.design.width * designScale * 0.5;
-                        const height = appState.modes.front.design.height * designScale * 0.5;
-                        const x = designPosition.x - width / 2;
-                        const y = designPosition.y - height / 2;
+                    // 티셔츠 경계 기준으로 위치 계산
+                    const zoomX = tshirtBounds ? 
+                        Math.min(tshirtBounds.x + tshirtBounds.width - zoomSize - 30, canvas.width - zoomSize - 20) :
+                        canvas.width - zoomSize - 20;
+                    const zoomY = tshirtBounds ?
+                        tshirtBounds.y + (tshirtBounds.height * 0.55) - (zoomSize / 2) :
+                        canvas.height - zoomSize - 100;
+                    
+                    // 원형 마스크
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(zoomX + zoomSize/2, zoomY + zoomSize/2, zoomSize/2, 0, Math.PI * 2);
+                    ctx.clip();
+                    
+                    // 배경
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(zoomX, zoomY, zoomSize, zoomSize);
+                    
+                    // 고화질 원본에서 확대 영역 그리기
+                    if (tshirtOriginal && designOriginal) {
+                        // 원본 이미지를 임시 캔버스에 고화질로 렌더링
+                        const tempCanvas = document.createElement('canvas');
+                        tempCanvas.width = 1500;
+                        tempCanvas.height = 1500;
+                        const tempCtx = tempCanvas.getContext('2d');
                         
-                        tempCtx.drawImage(appState.modes.front.design, x, y, width, height);
+                        // 티셔츠 고화질 렌더링
+                        if (tshirtOriginal) {
+                            const scale = Math.min(
+                                tempCanvas.width / tshirtOriginal.width,
+                                tempCanvas.height / tshirtOriginal.height
+                            ) * 0.9;
+                            
+                            const width = tshirtOriginal.width * scale;
+                            const height = tshirtOriginal.height * scale;
+                            const x = (tempCanvas.width - width) / 2;
+                            const y = (tempCanvas.height - height) / 2;
+                            
+                            tempCtx.drawImage(tshirtOriginal, x, y, width, height);
+                        }
+                        
+                        // 디자인 고화질 렌더링
+                        if (designOriginal) {
+                            const scaleRatio = tempCanvas.width / canvas.width;
+                            const width = designOriginal.width * designScale * scaleRatio * 0.5;
+                            const height = designOriginal.height * designScale * scaleRatio * 0.5;
+                            const x = (designPosition.x * scaleRatio) - width / 2;
+                            const y = (designPosition.y * scaleRatio) - height / 2;
+                            
+                            tempCtx.drawImage(designOriginal, x, y, width, height);
+                        }
+                        
+                        // 고화질 이미지에서 선택 영역 추출
+                        const scaleRatio = tempCanvas.width / canvas.width;
+                        ctx.drawImage(tempCanvas,
+                            zoomArea.x * scaleRatio,
+                            zoomArea.y * scaleRatio,
+                            zoomArea.width * scaleRatio,
+                            zoomArea.height * scaleRatio,
+                            zoomX, zoomY, zoomSize, zoomSize
+                        );
+                    } else {
+                        // 폴백: 캔버스에서 직접 확대
+                        ctx.drawImage(canvas,
+                            zoomArea.x, zoomArea.y,
+                            zoomArea.width, zoomArea.height,
+                            zoomX, zoomY, zoomSize, zoomSize
+                        );
                     }
-                    
-                    // 확대 이미지
-                    ctx.drawImage(tempCanvas,
-                        zoomArea.x - zoomSourceSize/2,
-                        zoomArea.y - zoomSourceSize/2,
-                        zoomSourceSize,
-                        zoomSourceSize,
-                        zoomX, zoomY, zoomSize, zoomSize
-                    );
                     
                     ctx.restore();
                     
-                    // 원형 테두리
-                    ctx.strokeStyle = '#10b981';
+                    // 흰색 원형 테두리
+                    ctx.strokeStyle = '#ffffff';
                     ctx.lineWidth = 3;
                     ctx.beginPath();
                     ctx.arc(zoomX + zoomSize/2, zoomY + zoomSize/2, zoomSize/2, 0, Math.PI * 2);
@@ -1743,22 +1843,43 @@
                     }
                     
                     // 디자인
-                    if (appState.modes.front.design) {
+                    if (designOriginal) {
                         const scaleRatio = outputCanvas.width / 600;
-                        const width = appState.modes.front.design.width * designScale * scaleRatio * 0.5;
-                        const height = appState.modes.front.design.height * designScale * scaleRatio * 0.5;
+                        const width = designOriginal.width * designScale * scaleRatio * 0.5;
+                        const height = designOriginal.height * designScale * scaleRatio * 0.5;
                         const x = (designPosition.x * scaleRatio) - width / 2;
                         const y = (designPosition.y * scaleRatio) - height / 2;
                         
-                        outputCtx.drawImage(appState.modes.front.design, x, y, width, height);
+                        outputCtx.drawImage(designOriginal, x, y, width, height);
                     }
                     
                     // 디테일 확대 추가
                     if (addDetailZoom && zoomArea) {
                         const zoomSize = 400; // 원형 확대 크기
-                        const zoomX = outputWidth - zoomSize - 50; // 우측 여백 50px
-                        const zoomY = outputHeight - zoomSize - 50; // 하단 여백 50px
-                        const scaleRatio = outputCanvas.width / 600;
+                        
+                        // 티셔츠 이미지 경계 계산
+                        let tshirtBounds = null;
+                        if (tshirt && tshirt.image) {
+                            const scale = Math.min(
+                                outputCanvas.width / tshirt.image.width,
+                                outputCanvas.height / tshirt.image.height
+                            ) * 0.9;
+                            
+                            const width = tshirt.image.width * scale;
+                            const height = tshirt.image.height * scale;
+                            const x = (outputCanvas.width - width) / 2;
+                            const y = (outputCanvas.height - height) / 2;
+                            
+                            tshirtBounds = { x, y, width, height };
+                        }
+                        
+                        // 티셔츠 경계 기준으로 위치 계산 (중간 높이)
+                        const zoomX = tshirtBounds ? 
+                            tshirtBounds.x + tshirtBounds.width - zoomSize - 80 : 
+                            outputWidth - zoomSize - 100;
+                        const zoomY = tshirtBounds ? 
+                            tshirtBounds.y + (tshirtBounds.height * 0.55) - (zoomSize / 2) : 
+                            outputHeight - zoomSize - 300;
                         
                         // 원형 클리핑
                         outputCtx.save();
@@ -1766,31 +1887,67 @@
                         outputCtx.arc(zoomX + zoomSize/2, zoomY + zoomSize/2, zoomSize/2, 0, Math.PI * 2);
                         outputCtx.clip();
                         
-                        // 확대 영역 계산
-                        const sourceSize = zoomSize / zoomLevel / scaleRatio;
-                        const sourceX = zoomArea.x * scaleRatio - sourceSize/2;
-                        const sourceY = zoomArea.y * scaleRatio - sourceSize/2;
+                        // 배경
+                        outputCtx.fillStyle = '#ffffff';
+                        outputCtx.fillRect(zoomX, zoomY, zoomSize, zoomSize);
                         
-                        // 임시 캔버스에 전체 이미지 복사
+                        // 고화질 원본으로 임시 캔버스 생성
                         const tempCanvas = document.createElement('canvas');
-                        tempCanvas.width = outputCanvas.width;
-                        tempCanvas.height = outputCanvas.height;
+                        tempCanvas.width = outputWidth;
+                        tempCanvas.height = outputHeight;
                         const tempCtx = tempCanvas.getContext('2d');
-                        tempCtx.drawImage(outputCanvas, 0, 0);
                         
-                        // 확대하여 그리기
-                        outputCtx.drawImage(tempCanvas, 
-                            sourceX, sourceY, sourceSize * scaleRatio, sourceSize * scaleRatio,
-                            zoomX, zoomY, zoomSize, zoomSize);
+                        // 티셔츠 원본 렌더링
+                        if (tshirt && tshirt.image) {
+                            const scale = Math.min(
+                                tempCanvas.width / tshirt.image.width,
+                                tempCanvas.height / tshirt.image.height
+                            ) * 0.9;
+                            
+                            const width = tshirt.image.width * scale;
+                            const height = tshirt.image.height * scale;
+                            const x = (tempCanvas.width - width) / 2;
+                            const y = (tempCanvas.height - height) / 2;
+                            
+                            tempCtx.drawImage(tshirt.image, x, y, width, height);
+                        }
+                        
+                        // 디자인 원본 렌더링
+                        if (designOriginal) {
+                            const scaleRatio = tempCanvas.width / 600;
+                            const width = designOriginal.width * designScale * scaleRatio * 0.5;
+                            const height = designOriginal.height * designScale * scaleRatio * 0.5;
+                            const x = (designPosition.x * scaleRatio) - width / 2;
+                            const y = (designPosition.y * scaleRatio) - height / 2;
+                            
+                            tempCtx.imageSmoothingEnabled = true;
+                            tempCtx.imageSmoothingQuality = 'high';
+                            tempCtx.drawImage(designOriginal, x, y, width, height);
+                        }
+                        
+                        // 선택 영역을 확대하여 그리기
+                        const scaleRatio = outputCanvas.width / 600;
+                        outputCtx.imageSmoothingEnabled = true;
+                        outputCtx.imageSmoothingQuality = 'high';
+                        outputCtx.drawImage(tempCanvas,
+                            zoomArea.x * scaleRatio,
+                            zoomArea.y * scaleRatio,
+                            zoomArea.width * scaleRatio,
+                            zoomArea.height * scaleRatio,
+                            zoomX, zoomY, zoomSize, zoomSize
+                        );
                         
                         outputCtx.restore();
                         
-                        // 원형 테두리 (선택사항)
-                        outputCtx.strokeStyle = '#e2e8f0';
-                        outputCtx.lineWidth = 2;
+                        // 흰색 원형 테두리
+                        outputCtx.strokeStyle = '#ffffff';
+                        outputCtx.lineWidth = 3;
+                        outputCtx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+                        outputCtx.shadowBlur = 5;
                         outputCtx.beginPath();
                         outputCtx.arc(zoomX + zoomSize/2, zoomY + zoomSize/2, zoomSize/2, 0, Math.PI * 2);
                         outputCtx.stroke();
+                        outputCtx.shadowColor = 'transparent';
                     }
                     
                     const blob = await new Promise(resolve => {
