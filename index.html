@@ -628,6 +628,26 @@
                     </div>
                 </div>
             </div>
+
+            <!-- 디테일 확대 옵션 -->
+            <div style="text-align: center; margin: 20px 0;">
+                <div style="display: inline-block; background: #ecfdf5; padding: 15px; border-radius: 10px; border: 1px solid #10b981;">
+                    <label style="font-weight: bold; margin-right: 10px;">
+                        <input type="checkbox" id="frontAddDetailZoom" style="margin-right: 5px;">
+                        디테일 확대컷 추가
+                    </label>
+                    <button id="frontSelectZoomArea" style="padding: 5px 10px; margin-left: 10px; background: #10b981; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                        영역 선택
+                    </button>
+                    <span style="margin-left: 20px;">배율:</span>
+                    <select id="frontZoomLevel" style="padding: 5px;">
+                        <option value="2">2x</option>
+                        <option value="3" selected>3x</option>
+                        <option value="4">4x</option>
+                        <option value="5">5x</option>
+                    </select>
+                </div>
+            </div>
         </div>
 
         <!-- Mode 2: 앞판+뒷판 -->
@@ -767,6 +787,39 @@
                     <span style="margin-left: 30px; font-weight: bold;">투명도:</span>
                     <input type="range" id="combineOpacity" min="30" max="100" value="100" style="width: 100px; vertical-align: middle;">
                     <span id="combineOpacityValue" style="margin-left: 5px;">100%</span>
+                </div>
+            </div>
+
+            <!-- 배경 제거 옵션 -->
+            <div style="text-align: center; margin: 20px 0;">
+                <div style="display: inline-block; background: #fef3c7; padding: 15px; border-radius: 10px; border: 1px solid #fbbf24;">
+                    <label style="font-weight: bold; margin-right: 10px;">
+                        <input type="checkbox" id="removeBackground" style="margin-right: 5px;">
+                        흰색 배경 제거 (매직완드)
+                    </label>
+                    <span style="margin-left: 20px;">감도:</span>
+                    <input type="range" id="bgRemoveSensitivity" min="10" max="50" value="30" style="width: 100px; vertical-align: middle;">
+                    <span id="bgSensitivityValue" style="margin-left: 5px;">30</span>
+                </div>
+            </div>
+
+            <!-- 확대 디테일 옵션 -->
+            <div style="text-align: center; margin: 20px 0;">
+                <div style="display: inline-block; background: #ecfdf5; padding: 15px; border-radius: 10px; border: 1px solid #10b981;">
+                    <label style="font-weight: bold; margin-right: 10px;">
+                        <input type="checkbox" id="addDetailZoom" style="margin-right: 5px;">
+                        디테일 확대컷 추가
+                    </label>
+                    <button id="selectZoomArea" style="padding: 5px 10px; margin-left: 10px; background: #10b981; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                        영역 선택
+                    </button>
+                    <span style="margin-left: 20px;">배율:</span>
+                    <select id="zoomLevel" style="padding: 5px;">
+                        <option value="2">2x</option>
+                        <option value="3" selected>3x</option>
+                        <option value="4">4x</option>
+                        <option value="5">5x</option>
+                    </select>
                 </div>
             </div>
 
@@ -1371,6 +1424,30 @@
             let designPosition = { x: 300, y: 200 };
             let designScale = 0.3;
             
+            // 확대 관련 설정 추가
+            let addDetailZoom = false;
+            let zoomArea = null;
+            let zoomLevel = 3;
+            let selectingZoomArea = false;
+            
+            // 디테일 확대 체크박스
+            document.getElementById('frontAddDetailZoom').addEventListener('change', (e) => {
+                addDetailZoom = e.target.checked;
+                renderFront();
+            });
+            
+            document.getElementById('frontZoomLevel').addEventListener('change', (e) => {
+                zoomLevel = parseInt(e.target.value);
+                renderFront();
+            });
+            
+            // 영역 선택 버튼
+            document.getElementById('frontSelectZoomArea').addEventListener('click', () => {
+                selectingZoomArea = true;
+                canvas.style.cursor = 'crosshair';
+                alert('확대할 영역의 중심을 클릭하세요');
+            });
+            
             // 파일 업로드
             document.getElementById('frontTshirtInput').addEventListener('change', (e) => {
                 const files = Array.from(e.target.files);
@@ -1434,11 +1511,20 @@
             
             // 드래그 이벤트
             canvas.addEventListener('mousedown', (e) => {
-                if (!appState.modes.front.design) return;
-                
                 const rect = canvas.getBoundingClientRect();
                 const x = (e.clientX - rect.left) * (canvas.width / rect.width);
                 const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+                
+                // 확대 영역 선택 모드
+                if (selectingZoomArea) {
+                    zoomArea = { x, y };
+                    selectingZoomArea = false;
+                    canvas.style.cursor = 'move';
+                    renderFront();
+                    return;
+                }
+                
+                if (!appState.modes.front.design) return;
                 
                 const design = appState.modes.front.design;
                 const width = design.width * designScale * 0.5;
@@ -1508,6 +1594,86 @@
                     ctx.strokeRect(x, y, width, height);
                     ctx.setLineDash([]);
                 }
+                
+                // 확대 영역 표시
+                if (addDetailZoom && zoomArea) {
+                    const zoomSourceSize = 100 / zoomLevel;
+                    
+                    // 선택 영역 표시
+                    ctx.strokeStyle = '#10b981';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.strokeRect(
+                        zoomArea.x - zoomSourceSize/2,
+                        zoomArea.y - zoomSourceSize/2,
+                        zoomSourceSize,
+                        zoomSourceSize
+                    );
+                    ctx.setLineDash([]);
+                    
+                    // 확대 미리보기 (우측 하단)
+                    const zoomSize = 150;
+                    const zoomX = canvas.width - zoomSize - 20;
+                    const zoomY = canvas.height - zoomSize - 20;
+                    
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(zoomX + zoomSize/2, zoomY + zoomSize/2, zoomSize/2, 0, Math.PI * 2);
+                    ctx.clip();
+                    
+                    // 배경
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(zoomX, zoomY, zoomSize, zoomSize);
+                    
+                    // 티셔츠와 디자인을 임시 캔버스에 그리기
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = canvas.width;
+                    tempCanvas.height = canvas.height;
+                    const tempCtx = tempCanvas.getContext('2d');
+                    
+                    // 티셔츠 복사
+                    if (tshirt && tshirt.image) {
+                        const scale = Math.min(
+                            canvas.width / tshirt.image.width,
+                            canvas.height / tshirt.image.height
+                        ) * 0.9;
+                        
+                        const width = tshirt.image.width * scale;
+                        const height = tshirt.image.height * scale;
+                        const x = (canvas.width - width) / 2;
+                        const y = (canvas.height - height) / 2;
+                        
+                        tempCtx.drawImage(tshirt.image, x, y, width, height);
+                    }
+                    
+                    // 디자인 복사
+                    if (appState.modes.front.design) {
+                        const width = appState.modes.front.design.width * designScale * 0.5;
+                        const height = appState.modes.front.design.height * designScale * 0.5;
+                        const x = designPosition.x - width / 2;
+                        const y = designPosition.y - height / 2;
+                        
+                        tempCtx.drawImage(appState.modes.front.design, x, y, width, height);
+                    }
+                    
+                    // 확대 이미지
+                    ctx.drawImage(tempCanvas,
+                        zoomArea.x - zoomSourceSize/2,
+                        zoomArea.y - zoomSourceSize/2,
+                        zoomSourceSize,
+                        zoomSourceSize,
+                        zoomX, zoomY, zoomSize, zoomSize
+                    );
+                    
+                    ctx.restore();
+                    
+                    // 원형 테두리
+                    ctx.strokeStyle = '#10b981';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(zoomX + zoomSize/2, zoomY + zoomSize/2, zoomSize/2, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
             }
             
             // 탭 업데이트
@@ -1554,8 +1720,8 @@
                 for (let i = 0; i < appState.modes.front.tshirts.length; i++) {
                     const outputCanvas = document.createElement('canvas');
                     const outputCtx = outputCanvas.getContext('2d');
-                    outputCanvas.width = 1200;
-                    outputCanvas.height = 1440;
+                    outputCanvas.width = outputWidth;
+                    outputCanvas.height = outputHeight;
                     
                     outputCtx.fillStyle = '#ffffff';
                     outputCtx.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
@@ -1585,6 +1751,46 @@
                         const y = (designPosition.y * scaleRatio) - height / 2;
                         
                         outputCtx.drawImage(appState.modes.front.design, x, y, width, height);
+                    }
+                    
+                    // 디테일 확대 추가
+                    if (addDetailZoom && zoomArea) {
+                        const zoomSize = 400; // 원형 확대 크기
+                        const zoomX = outputWidth - zoomSize - 50; // 우측 여백 50px
+                        const zoomY = outputHeight - zoomSize - 50; // 하단 여백 50px
+                        const scaleRatio = outputCanvas.width / 600;
+                        
+                        // 원형 클리핑
+                        outputCtx.save();
+                        outputCtx.beginPath();
+                        outputCtx.arc(zoomX + zoomSize/2, zoomY + zoomSize/2, zoomSize/2, 0, Math.PI * 2);
+                        outputCtx.clip();
+                        
+                        // 확대 영역 계산
+                        const sourceSize = zoomSize / zoomLevel / scaleRatio;
+                        const sourceX = zoomArea.x * scaleRatio - sourceSize/2;
+                        const sourceY = zoomArea.y * scaleRatio - sourceSize/2;
+                        
+                        // 임시 캔버스에 전체 이미지 복사
+                        const tempCanvas = document.createElement('canvas');
+                        tempCanvas.width = outputCanvas.width;
+                        tempCanvas.height = outputCanvas.height;
+                        const tempCtx = tempCanvas.getContext('2d');
+                        tempCtx.drawImage(outputCanvas, 0, 0);
+                        
+                        // 확대하여 그리기
+                        outputCtx.drawImage(tempCanvas, 
+                            sourceX, sourceY, sourceSize * scaleRatio, sourceSize * scaleRatio,
+                            zoomX, zoomY, zoomSize, zoomSize);
+                        
+                        outputCtx.restore();
+                        
+                        // 원형 테두리 (선택사항)
+                        outputCtx.strokeStyle = '#e2e8f0';
+                        outputCtx.lineWidth = 2;
+                        outputCtx.beginPath();
+                        outputCtx.arc(zoomX + zoomSize/2, zoomY + zoomSize/2, zoomSize/2, 0, Math.PI * 2);
+                        outputCtx.stroke();
                     }
                     
                     const blob = await new Promise(resolve => {
@@ -1844,8 +2050,8 @@
             function createFBCanvas(index, side, state) {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
-                canvas.width = 1200;
-                canvas.height = 1440;
+                canvas.width = outputWidth;
+                canvas.height = outputHeight;
                 
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1902,7 +2108,14 @@
                     opacity: 1.0
                 },
                 dragging: null,
-                dragStart: { x: 0, y: 0 }
+                dragStart: { x: 0, y: 0 },
+                // 새로운 설정 추가
+                removeBackground: false,
+                bgSensitivity: 30,
+                addDetailZoom: false,
+                zoomArea: null,
+                zoomLevel: 3,
+                selectingZoomArea: false
             };
             
             // 세트별 설정 초기화
@@ -1914,11 +2127,117 @@
                         frontScale: 0.5,
                         backScale: 1.0,
                         layerOrder: combineState.globalSettings.layerOrder,
-                        opacity: combineState.globalSettings.opacity
+                        opacity: combineState.globalSettings.opacity,
+                        zoomArea: null
                     };
                 }
                 return combineState.sets[index];
             }
+            
+            // 매직완드 배경 제거 함수
+            function removeWhiteBackground(imageData, sensitivity) {
+                const data = imageData.data;
+                const width = imageData.width;
+                const height = imageData.height;
+                const threshold = 255 - sensitivity;
+                
+                // Flood fill from corners
+                const visited = new Uint8Array(width * height);
+                const queue = [];
+                
+                // Start from 4 corners
+                const corners = [
+                    [0, 0], [width-1, 0], 
+                    [0, height-1], [width-1, height-1]
+                ];
+                
+                corners.forEach(([x, y]) => {
+                    const idx = (y * width + x) * 4;
+                    if (data[idx] > threshold && data[idx+1] > threshold && data[idx+2] > threshold) {
+                        queue.push([x, y]);
+                        visited[y * width + x] = 1;
+                    }
+                });
+                
+                // Flood fill
+                while (queue.length > 0) {
+                    const [x, y] = queue.shift();
+                    const idx = (y * width + x) * 4;
+                    
+                    // Make transparent
+                    data[idx + 3] = 0;
+                    
+                    // Check neighbors
+                    const neighbors = [
+                        [x-1, y], [x+1, y],
+                        [x, y-1], [x, y+1]
+                    ];
+                    
+                    neighbors.forEach(([nx, ny]) => {
+                        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                            const nIdx = ny * width + nx;
+                            const nDataIdx = nIdx * 4;
+                            
+                            if (!visited[nIdx] && 
+                                data[nDataIdx] > threshold && 
+                                data[nDataIdx+1] > threshold && 
+                                data[nDataIdx+2] > threshold) {
+                                visited[nIdx] = 1;
+                                queue.push([nx, ny]);
+                            }
+                        }
+                    });
+                }
+                
+                return imageData;
+            }
+            
+            // 배경 제거 체크박스
+            document.getElementById('removeBackground').addEventListener('change', (e) => {
+                combineState.removeBackground = e.target.checked;
+                renderCombine();
+            });
+            
+            document.getElementById('bgRemoveSensitivity').addEventListener('input', (e) => {
+                combineState.bgSensitivity = parseInt(e.target.value);
+                document.getElementById('bgSensitivityValue').textContent = e.target.value;
+                renderCombine();
+            });
+            
+            // 디테일 확대 체크박스
+            document.getElementById('addDetailZoom').addEventListener('change', (e) => {
+                combineState.addDetailZoom = e.target.checked;
+                renderCombine();
+            });
+            
+            document.getElementById('zoomLevel').addEventListener('change', (e) => {
+                combineState.zoomLevel = parseInt(e.target.value);
+                renderCombine();
+            });
+            
+            // 영역 선택 버튼
+            document.getElementById('selectZoomArea').addEventListener('click', () => {
+                combineState.selectingZoomArea = true;
+                canvas.style.cursor = 'crosshair';
+                alert('확대할 영역의 중심을 클릭하세요');
+            });
+            
+            // 캔버스 클릭으로 확대 영역 선택
+            canvas.addEventListener('click', (e) => {
+                if (!combineState.selectingZoomArea) return;
+                
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+                const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+                
+                const currentSet = initializeSet(combineState.currentIndex);
+                currentSet.zoomArea = { x, y };
+                combineState.zoomArea = { x, y };
+                combineState.selectingZoomArea = false;
+                canvas.style.cursor = 'default';
+                
+                renderCombine();
+            });
             
             // 앞판 파일 업로드 (여러 개)
             document.getElementById('completeFrontInput').addEventListener('change', (e) => {
@@ -2229,6 +2548,12 @@
                 
                 if (!frontImg || !backImg) return;
                 
+                // 배경 처리 (투명일 경우 체크패턴 유지)
+                if (!combineState.removeBackground) {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+                
                 // 레이어 순서에 따라 그리기
                 if (currentSet.layerOrder === 'front') {
                     drawImage(backImg.image, currentSet.backPosition, currentSet.backScale, currentSet.opacity);
@@ -2236,6 +2561,65 @@
                 } else {
                     drawImage(frontImg.image, currentSet.frontPosition, currentSet.frontScale, currentSet.opacity);
                     drawImage(backImg.image, currentSet.backPosition, currentSet.backScale, currentSet.opacity);
+                }
+                
+                // 배경 제거 미리보기 (선택사항)
+                if (combineState.removeBackground) {
+                    // 실시간 배경 제거는 성능 문제로 저장 시에만 적용
+                    ctx.fillStyle = 'rgba(255, 0, 0, 0.1)';
+                    ctx.fillRect(0, 0, canvas.width, 10);
+                    ctx.fillRect(0, canvas.height-10, canvas.width, 10);
+                    ctx.fillRect(0, 0, 10, canvas.height);
+                    ctx.fillRect(canvas.width-10, 0, 10, canvas.height);
+                }
+                
+                // 확대 영역 표시
+                if (combineState.addDetailZoom && currentSet.zoomArea) {
+                    const zoomSourceSize = 100 / combineState.zoomLevel;
+                    
+                    // 선택 영역 표시
+                    ctx.strokeStyle = '#10b981';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.strokeRect(
+                        currentSet.zoomArea.x - zoomSourceSize/2,
+                        currentSet.zoomArea.y - zoomSourceSize/2,
+                        zoomSourceSize,
+                        zoomSourceSize
+                    );
+                    ctx.setLineDash([]);
+                    
+                    // 확대 미리보기 (우측 하단)
+                    const zoomSize = 150;
+                    const zoomX = canvas.width - zoomSize - 20;
+                    const zoomY = canvas.height - zoomSize - 20;
+                    
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(zoomX + zoomSize/2, zoomY + zoomSize/2, zoomSize/2, 0, Math.PI * 2);
+                    ctx.clip();
+                    
+                    // 배경
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(zoomX, zoomY, zoomSize, zoomSize);
+                    
+                    // 확대 이미지
+                    ctx.drawImage(canvas,
+                        currentSet.zoomArea.x - zoomSourceSize/2,
+                        currentSet.zoomArea.y - zoomSourceSize/2,
+                        zoomSourceSize,
+                        zoomSourceSize,
+                        zoomX, zoomY, zoomSize, zoomSize
+                    );
+                    
+                    ctx.restore();
+                    
+                    // 원형 테두리
+                    ctx.strokeStyle = '#10b981';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(zoomX + zoomSize/2, zoomY + zoomSize/2, zoomSize/2, 0, Math.PI * 2);
+                    ctx.stroke();
                 }
             }
             
@@ -2269,20 +2653,70 @@
                     // 각 세트별로 캔버스 생성
                     const saveCanvas = document.createElement('canvas');
                     const saveCtx = saveCanvas.getContext('2d');
-                    saveCanvas.width = canvas.width;
-                    saveCanvas.height = canvas.height;
+                    saveCanvas.width = outputWidth;
+                    saveCanvas.height = outputHeight;
                     
-                    // 흰 배경
-                    saveCtx.fillStyle = '#ffffff';
-                    saveCtx.fillRect(0, 0, saveCanvas.width, saveCanvas.height);
+                    // 배경 처리 (투명 또는 흰색)
+                    if (!combineState.removeBackground) {
+                        saveCtx.fillStyle = '#ffffff';
+                        saveCtx.fillRect(0, 0, saveCanvas.width, saveCanvas.height);
+                    }
                     
                     // 레이어 순서대로 그리기
+                    const scaleRatio = outputWidth / canvas.width;
+                    
                     if (currentSet.layerOrder === 'front') {
-                        drawToCanvas(saveCtx, backImg.image, currentSet.backPosition, currentSet.backScale);
-                        drawToCanvas(saveCtx, frontImg.image, currentSet.frontPosition, currentSet.frontScale);
+                        drawToCanvas(saveCtx, backImg.image, currentSet.backPosition, currentSet.backScale, scaleRatio);
+                        drawToCanvas(saveCtx, frontImg.image, currentSet.frontPosition, currentSet.frontScale, scaleRatio);
                     } else {
-                        drawToCanvas(saveCtx, frontImg.image, currentSet.frontPosition, currentSet.frontScale);
-                        drawToCanvas(saveCtx, backImg.image, currentSet.backPosition, currentSet.backScale);
+                        drawToCanvas(saveCtx, frontImg.image, currentSet.frontPosition, currentSet.frontScale, scaleRatio);
+                        drawToCanvas(saveCtx, backImg.image, currentSet.backPosition, currentSet.backScale, scaleRatio);
+                    }
+                    
+                    // 배경 제거 처리
+                    if (combineState.removeBackground) {
+                        const imageData = saveCtx.getImageData(0, 0, saveCanvas.width, saveCanvas.height);
+                        const processedData = removeWhiteBackground(imageData, combineState.bgSensitivity);
+                        saveCtx.putImageData(processedData, 0, 0);
+                    }
+                    
+                    // 디테일 확대 추가
+                    if (combineState.addDetailZoom && currentSet.zoomArea) {
+                        const zoomSize = 400; // 원형 확대 크기
+                        const zoomX = outputWidth - zoomSize - 50; // 우측 여백 50px
+                        const zoomY = outputHeight - zoomSize - 50; // 하단 여백 50px
+                        
+                        // 원형 클리핑
+                        saveCtx.save();
+                        saveCtx.beginPath();
+                        saveCtx.arc(zoomX + zoomSize/2, zoomY + zoomSize/2, zoomSize/2, 0, Math.PI * 2);
+                        saveCtx.clip();
+                        
+                        // 확대 영역 계산
+                        const sourceSize = zoomSize / combineState.zoomLevel / scaleRatio;
+                        const sourceX = currentSet.zoomArea.x * scaleRatio - sourceSize/2;
+                        const sourceY = currentSet.zoomArea.y * scaleRatio - sourceSize/2;
+                        
+                        // 임시 캔버스에 합성 이미지 복사
+                        const tempCanvas = document.createElement('canvas');
+                        tempCanvas.width = saveCanvas.width;
+                        tempCanvas.height = saveCanvas.height;
+                        const tempCtx = tempCanvas.getContext('2d');
+                        tempCtx.drawImage(saveCanvas, 0, 0);
+                        
+                        // 확대하여 그리기
+                        saveCtx.drawImage(tempCanvas, 
+                            sourceX, sourceY, sourceSize * scaleRatio, sourceSize * scaleRatio,
+                            zoomX, zoomY, zoomSize, zoomSize);
+                        
+                        saveCtx.restore();
+                        
+                        // 원형 테두리 (선택사항)
+                        saveCtx.strokeStyle = '#e2e8f0';
+                        saveCtx.lineWidth = 2;
+                        saveCtx.beginPath();
+                        saveCtx.arc(zoomX + zoomSize/2, zoomY + zoomSize/2, zoomSize/2, 0, Math.PI * 2);
+                        saveCtx.stroke();
                     }
                     
                     const blob = await new Promise(resolve => {
@@ -2326,12 +2760,12 @@
                     showSaveSuccess('합성 이미지 저장 완료!');
                 }
                 
-                function drawToCanvas(ctx, image, position, scale) {
+                function drawToCanvas(ctx, image, position, scale, ratio = 1) {
                     if (!image) return;
-                    const width = image.width * scale * 0.5;
-                    const height = image.height * scale * 0.5;
-                    const x = position.x - width / 2;
-                    const y = position.y - height / 2;
+                    const width = image.width * scale * 0.5 * ratio;
+                    const height = image.height * scale * 0.5 * ratio;
+                    const x = position.x * ratio - width / 2;
+                    const y = position.y * ratio - height / 2;
                     ctx.drawImage(image, x, y, width, height);
                 }
             };
