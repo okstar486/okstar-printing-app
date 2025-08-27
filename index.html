@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="author" content="OKSTAR KOREA COMPANY">
     <meta name="copyright" content="© 2024 OKSTAR KOREA COMPANY. All Rights Reserved.">
-    <meta name="description" content="Professional T-Shirt Design Solution by OKSTAR KOREA - v4.0">
+    <meta name="description" content="Professional T-Shirt Design Solution by OKSTAR KOREA - v5.0">
     
     <!-- Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-313E028ZYQ"></script>
@@ -16,7 +16,7 @@
         gtag('config', 'G-313E028ZYQ');
     </script>
     
-    <title>옥스타 프린팅 프로그램 v4.0 | OKSTAR KOREA COMPANY</title>
+    <title>옥스타 프린팅 프로그램 v5.0 | OKSTAR KOREA COMPANY</title>
     
     <style>
         * {
@@ -84,10 +84,12 @@
             background: #f0f9ff;
             border-radius: 15px;
             border: 2px solid #3b82f6;
+            flex-wrap: wrap;
         }
 
         .mode-card {
             flex: 1;
+            min-width: 200px;
             padding: 20px;
             background: white;
             border: 2px solid #e2e8f0;
@@ -378,6 +380,148 @@
             border-radius: 10px;
         }
 
+        /* 모드 4 전용 스타일 */
+        .colorchip-controls {
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .colorchip-grid {
+            display: grid;
+            gap: 10px;
+            margin: 20px 0;
+            padding: 20px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+        }
+
+        .colorchip-item {
+            text-align: center;
+        }
+
+        .colorchip-image {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+            border-radius: 5px;
+            background: #f8fafc;
+        }
+
+        .colorchip-text {
+            margin-top: 8px;
+            padding: 5px;
+            border: 1px solid transparent;
+            background: transparent;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .colorchip-text:hover,
+        .colorchip-text:focus {
+            border-color: #3b82f6;
+            background: #f0f9ff;
+            outline: none;
+        }
+
+        .advanced-settings {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .advanced-toggle {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        .advanced-content {
+            display: none;
+            margin-top: 15px;
+        }
+
+        .advanced-content.show {
+            display: block;
+        }
+
+        .position-btn {
+            padding: 6px 12px;
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .position-btn:hover {
+            border-color: #3b82f6;
+        }
+
+        .position-btn.active {
+            background: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+
+        .batch-edit-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .batch-edit-modal.show {
+            display: flex;
+        }
+
+        .batch-edit-content {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .batch-edit-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .batch-edit-item label {
+            min-width: 30px;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        .batch-edit-item input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
         @media (max-width: 768px) {
             .mode-selector {
                 flex-direction: column;
@@ -398,7 +542,7 @@
         <div class="header">
             <h1>
                 🎨 옥스타 프린팅 프로그램
-                <span class="version-badge">v4.0</span>
+                <span class="version-badge">v5.0</span>
             </h1>
             <p style="color: #6b7280; font-size: 14px; margin-top: 10px;">Multi-Mode Professional T-Shirt Design Solution</p>
             <div class="company-badge">OKSTAR KOREA COMPANY</div>
@@ -420,6 +564,11 @@
                 <div class="mode-icon">🎨</div>
                 <div class="mode-title">디자인 합성</div>
                 <div class="mode-desc">앞뒤 디자인을 하나로 합치기</div>
+            </div>
+            <div class="mode-card" data-mode="colorchip">
+                <div class="mode-icon">🎨</div>
+                <div class="mode-title">컬러칩 제작</div>
+                <div class="mode-desc">색상별 제품을 깔끔하게 정리</div>
             </div>
         </div>
 
@@ -641,6 +790,114 @@
             </div>
         </div>
 
+        <!-- Mode 4: 컬러칩 제작 -->
+        <div id="colorchipMode" class="mode-content">
+            <div class="colorchip-controls">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <input type="file" id="colorchipInput" accept="image/*" multiple style="display: none;">
+                    <label for="colorchipInput" class="upload-label" style="display: inline-block; width: 300px; padding: 20px;">
+                        📁 이미지 업로드<br>
+                        <small>최대 20개 선택 가능</small>
+                        <div id="colorchipUploadStatus" style="margin-top: 10px; font-weight: bold;"></div>
+                    </label>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                    <div>
+                        <label style="font-weight: bold; display: block; margin-bottom: 5px;">가로 크기:</label>
+                        <input type="number" id="colorchipWidth" value="1500" style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px;">
+                    </div>
+                    <div>
+                        <label style="font-weight: bold; display: block; margin-bottom: 5px;">열 개수:</label>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="position-btn" data-cols="2">2개</button>
+                            <button class="position-btn active" data-cols="3">3개</button>
+                            <button class="position-btn" data-cols="4">4개</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                        <label style="font-weight: bold; display: block; margin-bottom: 5px;">텍스트 크기:</label>
+                        <select id="colorchipFontSize" style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px;">
+                            <option value="10">10px</option>
+                            <option value="12" selected>12px</option>
+                            <option value="14">14px</option>
+                            <option value="16">16px</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-weight: bold; display: block; margin-bottom: 5px;">텍스트 색상:</label>
+                        <select id="colorchipTextColor" style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px;">
+                            <option value="#000000">검정</option>
+                            <option value="#666666">회색</option>
+                            <option value="#333333">진회색</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="text-align: center; margin-top: 15px;">
+                    <button id="colorchipBatchEdit" style="padding: 10px 20px; background: #6366f1; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                        텍스트 일괄 편집
+                    </button>
+                    <button id="colorchipReset" style="padding: 10px 20px; background: #94a3b8; color: white; border: none; border-radius: 6px; cursor: pointer; margin-left: 10px;">
+                        기본값으로 리셋
+                    </button>
+                </div>
+
+                <!-- 고급 설정 -->
+                <div class="advanced-settings">
+                    <div class="advanced-toggle" onclick="toggleAdvanced()">
+                        <span id="advancedArrow">▶</span> 고급 설정
+                    </div>
+                    <div id="advancedContent" class="advanced-content">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px;">
+                            <div>
+                                <label style="font-weight: bold; display: block; margin-bottom: 5px;">이미지 간격:</label>
+                                <input type="number" id="colorchipImageGap" value="10" min="0" max="50" style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px;">
+                            </div>
+                            <div>
+                                <label style="font-weight: bold; display: block; margin-bottom: 5px;">텍스트 간격:</label>
+                                <input type="number" id="colorchipTextGap" value="8" min="0" max="20" style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px;">
+                            </div>
+                            <div>
+                                <label style="font-weight: bold; display: block; margin-bottom: 5px;">외부 여백:</label>
+                                <input type="number" id="colorchipPadding" value="20" min="0" max="100" style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px;">
+                            </div>
+                            <div>
+                                <label style="font-weight: bold; display: block; margin-bottom: 5px;">텍스트 정렬:</label>
+                                <select id="colorchipTextAlign" style="width: 100%; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px;">
+                                    <option value="center">중앙</option>
+                                    <option value="left">왼쪽</option>
+                                    <option value="right">오른쪽</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 미리보기 -->
+            <div id="colorchipPreview" class="colorchip-grid" style="grid-template-columns: repeat(3, 1fr);"></div>
+            
+            <!-- 캔버스 (숨김) -->
+            <canvas id="colorchipCanvas" style="display: none;"></canvas>
+        </div>
+
+        <!-- 텍스트 일괄 편집 모달 -->
+        <div id="batchEditModal" class="batch-edit-modal">
+            <div class="batch-edit-content">
+                <h3 style="margin-bottom: 20px;">텍스트 일괄 편집</h3>
+                <div id="batchEditList"></div>
+                <div style="text-align: center; margin-top: 20px;">
+                    <button onclick="applyBatchEdit()" style="padding: 10px 20px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; margin-right: 10px;">적용</button>
+                    <button onclick="closeBatchEdit()" style="padding: 10px 20px; background: #94a3b8; color: white; border: none; border-radius: 6px; cursor: pointer;">취소</button>
+                    <button onclick="resetToDefault()" style="padding: 10px 20px; background: #f59e0b; color: white; border: none; border-radius: 6px; cursor: pointer; margin-left: 10px;">기본값</button>
+                </div>
+            </div>
+        </div>
+
         <!-- 파일명 설정 및 저장 버튼 -->
         <div style="margin: 20px 0;">
             <div style="text-align: center; margin-bottom: 10px;">
@@ -670,8 +927,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <script>
-        // 옥스타 프린팅 프로그램 v4.0
-        console.log('🎨 옥스타 프린팅 프로그램 v4.0 시작');
+        // 옥스타 프린팅 프로그램 v5.0
+        console.log('🎨 옥스타 프린팅 프로그램 v5.0 시작');
         console.log('© 2024 OKSTAR KOREA COMPANY');
 
         // 전역 설정
@@ -691,9 +948,30 @@
                     front: { tshirts: [], design: null, currentIndex: 0 },
                     back: { tshirts: [], design: null, currentIndex: 0 }
                 },
-                combine: { frontImage: null, backImage: null }
+                combine: { frontImage: null, backImage: null },
+                colorchip: {
+                    images: [],
+                    texts: [],
+                    columns: 3,
+                    settings: {
+                        width: 1500,
+                        fontSize: 12,
+                        textColor: '#000000',
+                        imageGap: 10,
+                        textGap: 8,
+                        padding: 20,
+                        textAlign: 'center'
+                    }
+                }
             }
         };
+
+        // 컬러칩 기본 프리셋
+        const colorchipPreset = [
+            'BLACK', 'GRAY', 'NAVY', 'WHITE', 'DARK GREEN',
+            'KHAKI', 'DEEP BLUE', 'LIGHT GRAY', 'CREAM', 
+            'LIGHT BEIGE', 'OATMEAL'
+        ];
 
         // 초기화
         document.addEventListener('DOMContentLoaded', () => {
@@ -703,8 +981,283 @@
             initMode1();  // 앞판 전용
             initMode2();  // 앞판+뒷판
             initMode3();  // 완성본 합성
+            initMode4();  // 컬러칩 제작
             initUndoSystem();
         });
+
+        // Mode 4: 컬러칩 제작 초기화
+        function initMode4() {
+            const fileInput = document.getElementById('colorchipInput');
+            const preview = document.getElementById('colorchipPreview');
+            const canvas = document.getElementById('colorchipCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            // 파일 업로드
+            fileInput.addEventListener('change', (e) => {
+                const files = Array.from(e.target.files).slice(0, 20); // 최대 20개
+                appState.modes.colorchip.images = [];
+                appState.modes.colorchip.texts = [];
+                
+                let loadedCount = 0;
+                files.forEach((file, index) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            appState.modes.colorchip.images[index] = img;
+                            
+                            // 기본 프리셋 텍스트 설정 (11개까지만)
+                            if (index < colorchipPreset.length) {
+                                appState.modes.colorchip.texts[index] = colorchipPreset[index];
+                            } else {
+                                appState.modes.colorchip.texts[index] = '';
+                            }
+                            
+                            loadedCount++;
+                            if (loadedCount === files.length) {
+                                updateColorchipPreview();
+                                updateSaveButton();
+                                document.getElementById('colorchipUploadStatus').textContent = 
+                                    `${files.length}개 업로드 완료`;
+                            }
+                        };
+                        img.src = event.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                });
+            });
+            
+            // 열 개수 버튼
+            document.querySelectorAll('[data-cols]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('[data-cols]').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    appState.modes.colorchip.columns = parseInt(e.target.dataset.cols);
+                    updateColorchipPreview();
+                });
+            });
+            
+            // 설정 변경 이벤트
+            const settingInputs = [
+                'colorchipWidth', 'colorchipFontSize', 'colorchipTextColor',
+                'colorchipImageGap', 'colorchipTextGap', 'colorchipPadding', 'colorchipTextAlign'
+            ];
+            
+            settingInputs.forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.addEventListener('change', () => {
+                        updateColorchipSettings();
+                        updateColorchipPreview();
+                    });
+                }
+            });
+            
+            // 일괄 편집 버튼
+            document.getElementById('colorchipBatchEdit').addEventListener('click', openBatchEdit);
+            
+            // 리셋 버튼
+            document.getElementById('colorchipReset').addEventListener('click', () => {
+                appState.modes.colorchip.texts.forEach((_, index) => {
+                    if (index < colorchipPreset.length) {
+                        appState.modes.colorchip.texts[index] = colorchipPreset[index];
+                    }
+                });
+                updateColorchipPreview();
+            });
+            
+            // 미리보기 업데이트
+            function updateColorchipPreview() {
+                preview.innerHTML = '';
+                preview.style.gridTemplateColumns = `repeat(${appState.modes.colorchip.columns}, 1fr)`;
+                
+                appState.modes.colorchip.images.forEach((img, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'colorchip-item';
+                    
+                    const imgEl = document.createElement('img');
+                    imgEl.src = img.src;
+                    imgEl.className = 'colorchip-image';
+                    
+                    const textEl = document.createElement('input');
+                    textEl.type = 'text';
+                    textEl.className = 'colorchip-text';
+                    textEl.value = appState.modes.colorchip.texts[index] || '';
+                    textEl.style.fontSize = appState.modes.colorchip.settings.fontSize + 'px';
+                    textEl.style.color = appState.modes.colorchip.settings.textColor;
+                    textEl.style.textAlign = appState.modes.colorchip.settings.textAlign;
+                    
+                    textEl.addEventListener('input', (e) => {
+                        appState.modes.colorchip.texts[index] = e.target.value;
+                    });
+                    
+                    item.appendChild(imgEl);
+                    item.appendChild(textEl);
+                    preview.appendChild(item);
+                });
+            }
+            
+            // 설정 업데이트
+            function updateColorchipSettings() {
+                const settings = appState.modes.colorchip.settings;
+                settings.width = parseInt(document.getElementById('colorchipWidth').value);
+                settings.fontSize = parseInt(document.getElementById('colorchipFontSize').value);
+                settings.textColor = document.getElementById('colorchipTextColor').value;
+                settings.imageGap = parseInt(document.getElementById('colorchipImageGap').value);
+                settings.textGap = parseInt(document.getElementById('colorchipTextGap').value);
+                settings.padding = parseInt(document.getElementById('colorchipPadding').value);
+                settings.textAlign = document.getElementById('colorchipTextAlign').value;
+            }
+            
+            // 저장 함수
+            window.saveMode4 = async function() {
+                const settings = appState.modes.colorchip.settings;
+                const columns = appState.modes.colorchip.columns;
+                const images = appState.modes.colorchip.images;
+                const texts = appState.modes.colorchip.texts;
+                
+                if (images.length === 0) return;
+                
+                const rows = Math.ceil(images.length / columns);
+                const imageSize = (settings.width - settings.padding * 2 - settings.imageGap * (columns - 1)) / columns;
+                const textHeight = settings.fontSize + settings.textGap;
+                const rowHeight = imageSize + textHeight;
+                const canvasHeight = settings.padding * 2 + rowHeight * rows + settings.imageGap * (rows - 1);
+                
+                canvas.width = settings.width;
+                canvas.height = canvasHeight;
+                
+                // 흰색 배경
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // 이미지와 텍스트 그리기
+                images.forEach((img, index) => {
+                    const col = index % columns;
+                    const row = Math.floor(index / columns);
+                    
+                    const x = settings.padding + col * (imageSize + settings.imageGap);
+                    const y = settings.padding + row * (rowHeight + settings.imageGap);
+                    
+                    // 이미지 그리기 (정사각형 크롭)
+                    const srcSize = Math.min(img.width, img.height);
+                    const srcX = (img.width - srcSize) / 2;
+                    const srcY = (img.height - srcSize) / 2;
+                    
+                    ctx.drawImage(img, srcX, srcY, srcSize, srcSize, x, y, imageSize, imageSize);
+                    
+                    // 텍스트 그리기
+                    ctx.fillStyle = settings.textColor;
+                    ctx.font = `600 ${settings.fontSize}px Pretendard, -apple-system, sans-serif`;
+                    ctx.textAlign = settings.textAlign;
+                    
+                    let textX = x;
+                    if (settings.textAlign === 'center') textX = x + imageSize / 2;
+                    else if (settings.textAlign === 'right') textX = x + imageSize;
+                    
+                    const textY = y + imageSize + settings.textGap + settings.fontSize;
+                    ctx.fillText(texts[index] || '', textX, textY);
+                });
+                
+                // 다운로드
+                canvas.toBlob((blob) => {
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+                    a.download = `colorchip_${date}_OKSTAR.png`;
+                    a.click();
+                    showSaveSuccess('컬러칩 저장 완료!');
+                }, 'image/png', 1.0);
+            };
+        }
+        
+        // 고급 설정 토글
+        function toggleAdvanced() {
+            const content = document.getElementById('advancedContent');
+            const arrow = document.getElementById('advancedArrow');
+            
+            content.classList.toggle('show');
+            arrow.textContent = content.classList.contains('show') ? '▼' : '▶';
+        }
+        
+        // 일괄 편집 모달
+        function openBatchEdit() {
+            const modal = document.getElementById('batchEditModal');
+            const list = document.getElementById('batchEditList');
+            
+            list.innerHTML = '';
+            appState.modes.colorchip.texts.forEach((text, index) => {
+                const item = document.createElement('div');
+                item.className = 'batch-edit-item';
+                item.innerHTML = `
+                    <label>${index + 1}.</label>
+                    <input type="text" value="${text}" data-index="${index}">
+                `;
+                list.appendChild(item);
+            });
+            
+            modal.classList.add('show');
+        }
+        
+        function closeBatchEdit() {
+            document.getElementById('batchEditModal').classList.remove('show');
+        }
+        
+        function applyBatchEdit() {
+            const inputs = document.querySelectorAll('#batchEditList input');
+            inputs.forEach(input => {
+                const index = parseInt(input.dataset.index);
+                appState.modes.colorchip.texts[index] = input.value;
+            });
+            
+            closeBatchEdit();
+            updateColorchipPreview();
+        }
+        
+        function resetToDefault() {
+            const list = document.getElementById('batchEditList');
+            const inputs = list.querySelectorAll('input');
+            
+            inputs.forEach((input, index) => {
+                if (index < colorchipPreset.length) {
+                    input.value = colorchipPreset[index];
+                } else {
+                    input.value = '';
+                }
+            });
+        }
+        
+        // 컬러칩 미리보기 업데이트 함수 (글로벌)
+        function updateColorchipPreview() {
+            const preview = document.getElementById('colorchipPreview');
+            preview.innerHTML = '';
+            preview.style.gridTemplateColumns = `repeat(${appState.modes.colorchip.columns}, 1fr)`;
+            
+            appState.modes.colorchip.images.forEach((img, index) => {
+                const item = document.createElement('div');
+                item.className = 'colorchip-item';
+                
+                const imgEl = document.createElement('img');
+                imgEl.src = img.src;
+                imgEl.className = 'colorchip-image';
+                
+                const textEl = document.createElement('input');
+                textEl.type = 'text';
+                textEl.className = 'colorchip-text';
+                textEl.value = appState.modes.colorchip.texts[index] || '';
+                textEl.style.fontSize = appState.modes.colorchip.settings.fontSize + 'px';
+                textEl.style.color = appState.modes.colorchip.settings.textColor;
+                textEl.style.textAlign = appState.modes.colorchip.settings.textAlign;
+                
+                textEl.addEventListener('input', (e) => {
+                    appState.modes.colorchip.texts[index] = e.target.value;
+                });
+                
+                item.appendChild(imgEl);
+                item.appendChild(textEl);
+                preview.appendChild(item);
+            });
+        }
 
         // 픽셀 크기 설정 초기화
         function initPixelSizeControl() {
@@ -734,6 +1287,8 @@
                     filenameHint.textContent = '예시: okstar-01-front.png, okstar-01-back.png';
                 } else if (mode === 'combine') {
                     filenameHint.textContent = '예시: okstar-01-combined.png';
+                } else if (mode === 'colorchip') {
+                    filenameHint.textContent = '예시: colorchip-20241128.png';
                 }
             };
         }
@@ -779,7 +1334,8 @@
             const instructions = {
                 'front': '1️⃣ 앞판 무지 티셔츠 업로드 2️⃣ 앞판 디자인 배치 3️⃣ 저장 → 색상별 자동 저장!',
                 'frontback': '1️⃣ 앞뒤 무지 티셔츠 각각 업로드 2️⃣ 앞판 디자인 배치 (작게) 3️⃣ 뒷판 디자인 배치 (크게) 4️⃣ 저장!',
-                'combine': '1️⃣ 완성된 앞판 이미지 업로드 2️⃣ 완성된 뒷판 이미지 업로드 3️⃣ 크기 조절 4️⃣ 합성 이미지 저장!'
+                'combine': '1️⃣ 완성된 앞판 이미지 업로드 2️⃣ 완성된 뒷판 이미지 업로드 3️⃣ 크기 조절 4️⃣ 합성 이미지 저장!',
+                'colorchip': '1️⃣ 제품 이미지 업로드 (최대 20개) 2️⃣ 색상명 확인/수정 3️⃣ 레이아웃 조절 4️⃣ 컬러칩 저장!'
             };
             
             modeCards.forEach(card => {
@@ -795,6 +1351,7 @@
                     document.getElementById(mode + 'Mode').classList.add('active');
                     
                     modeInstruction.textContent = instructions[mode];
+                    updateFilenameHint(mode);
                     
                     // 저장 버튼 상태 업데이트
                     updateSaveButton();
@@ -1924,6 +2481,11 @@
                         text = setCount > 1 ? `🎨 ${setCount}개 세트 합성 저장` : '🎨 합성 이미지 저장';
                     }
                 }
+            } else if (appState.currentMode === 'colorchip') {
+                if (appState.modes.colorchip.images.length > 0) {
+                    ready = true;
+                    text = `🎨 컬러칩 저장 (${appState.modes.colorchip.images.length}개)`;
+                }
             }
             
             saveBtn.disabled = !ready;
@@ -1938,6 +2500,8 @@
                 saveMode2();
             } else if (appState.currentMode === 'combine') {
                 saveMode3();
+            } else if (appState.currentMode === 'colorchip') {
+                saveMode4();
             }
         });
 
