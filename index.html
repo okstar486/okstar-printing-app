@@ -647,6 +647,16 @@
                         <option value="5">5x</option>
                     </select>
                     
+                    <!-- 고정/이동 버튼 -->
+                    <div style="margin-top: 10px;">
+                        <button id="frontZoomFixBtn" style="padding: 6px 12px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 5px;">
+                            🔒 고정
+                        </button>
+                        <button id="frontZoomMoveBtn" style="padding: 6px 12px; background: #94a3b8; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                            🔓 이동
+                        </button>
+                    </div>
+                    
                     <!-- 위치 조절 추가 -->
                     <div style="margin-top: 10px;">
                         <span style="font-weight: bold;">확대컷 위치:</span>
@@ -831,6 +841,27 @@
                         <option value="4">4x</option>
                         <option value="5">5x</option>
                     </select>
+                    
+                    <!-- 고정/이동 버튼 추가 -->
+                    <div style="margin-top: 10px;">
+                        <button id="combineZoomFixBtn" style="padding: 6px 12px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 5px;">
+                            🔒 고정
+                        </button>
+                        <button id="combineZoomMoveBtn" style="padding: 6px 12px; background: #94a3b8; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                            🔓 이동
+                        </button>
+                    </div>
+                    
+                    <!-- 위치 조절 추가 -->
+                    <div style="margin-top: 10px;">
+                        <span style="font-weight: bold;">확대컷 위치:</span>
+                        <span style="margin-left: 10px;">가로:</span>
+                        <input type="range" id="combineZoomX" min="0" max="100" value="85" style="width: 100px;">
+                        <span id="combineZoomXValue">85%</span>
+                        <span style="margin-left: 20px;">세로:</span>
+                        <input type="range" id="combineZoomY" min="0" max="100" value="70" style="width: 100px;">
+                        <span id="combineZoomYValue">70%</span>
+                    </div>
                 </div>
             </div>
 
@@ -1445,6 +1476,7 @@
             let selectionEnd = null;
             let zoomPositionX = 85; // 가로 위치 %
             let zoomPositionY = 70; // 세로 위치 %
+            let zoomFixed = true; // 확대컷 고정 상태
             
             // 원본 이미지 저장용
             let designOriginal = null;
@@ -1459,6 +1491,23 @@
             document.getElementById('frontZoomLevel').addEventListener('change', (e) => {
                 zoomLevel = parseInt(e.target.value);
                 renderFront();
+            });
+            
+            // 고정/이동 버튼 이벤트
+            document.getElementById('frontZoomFixBtn').addEventListener('click', () => {
+                zoomFixed = true;
+                document.getElementById('frontZoomFixBtn').style.background = '#3b82f6';
+                document.getElementById('frontZoomMoveBtn').style.background = '#94a3b8';
+                document.getElementById('frontZoomX').disabled = true;
+                document.getElementById('frontZoomY').disabled = true;
+            });
+            
+            document.getElementById('frontZoomMoveBtn').addEventListener('click', () => {
+                zoomFixed = false;
+                document.getElementById('frontZoomMoveBtn').style.background = '#3b82f6';
+                document.getElementById('frontZoomFixBtn').style.background = '#94a3b8';
+                document.getElementById('frontZoomX').disabled = false;
+                document.getElementById('frontZoomY').disabled = false;
             });
             
             // 위치 조절 슬라이더
@@ -1647,61 +1696,18 @@
                     const y = designPosition.y - height / 2;
                     
                     ctx.drawImage(appState.modes.front.design, x, y, width, height);
-                    
-                    // 테두리
-                    ctx.strokeStyle = 'rgba(59, 130, 246, 0.3)';
-                    ctx.lineWidth = 2;
-                    ctx.setLineDash([5, 5]);
-                    ctx.strokeRect(x, y, width, height);
-                    ctx.setLineDash([]);
                 }
                 
-                // 선택 영역 표시 (드래그 중)
-                if (isSelectingArea && selectionStart && selectionEnd) {
-                    ctx.strokeStyle = '#f59e0b';
-                    ctx.lineWidth = 2;
-                    ctx.setLineDash([5, 5]);
-                    const width = selectionEnd.x - selectionStart.x;
-                    const height = selectionEnd.y - selectionStart.y;
-                    ctx.strokeRect(selectionStart.x, selectionStart.y, width, height);
-                    ctx.setLineDash([]);
-                }
+                // 선택 영역 표시 제거 (드래그 중에도 표시하지 않음)
                 
-                // 확대 영역 표시
+                // 확대 영역 표시 (선택된 영역 박스는 표시하지 않음)
                 if (addDetailZoom && zoomArea) {
-                    // 선택 영역 표시
-                    ctx.strokeStyle = '#ffffff';
-                    ctx.lineWidth = 2;
-                    ctx.setLineDash([5, 5]);
-                    ctx.strokeRect(zoomArea.x, zoomArea.y, zoomArea.width, zoomArea.height);
-                    ctx.setLineDash([]);
-                    
-                    // 확대 미리보기 (우측 하단)
+                    // 확대 미리보기 (위치 조절 가능)
                     const zoomSize = 150;
                     
-                    // 티셔츠 경계 계산 (미리보기용)
-                    let tshirtBounds = null;
-                    if (tshirt && tshirt.image) {
-                        const scale = Math.min(
-                            canvas.width / tshirt.image.width,
-                            canvas.height / tshirt.image.height
-                        ) * 0.9;
-                        
-                        const width = tshirt.image.width * scale;
-                        const height = tshirt.image.height * scale;
-                        const x = (canvas.width - width) / 2;
-                        const y = (canvas.height - height) / 2;
-                        
-                        tshirtBounds = { x, y, width, height };
-                    }
-                    
-                    // 티셔츠 경계 기준으로 위치 계산
-                    const zoomX = tshirtBounds ? 
-                        Math.min(tshirtBounds.x + tshirtBounds.width - zoomSize - 30, canvas.width - zoomSize - 20) :
-                        canvas.width - zoomSize - 20;
-                    const zoomY = tshirtBounds ?
-                        tshirtBounds.y + (tshirtBounds.height * 0.55) - (zoomSize / 2) :
-                        canvas.height - zoomSize - 100;
+                    // 위치 조절 가능한 확대컷 위치 계산
+                    const zoomX = (canvas.width - zoomSize) * (zoomPositionX / 100);
+                    const zoomY = (canvas.height - zoomSize) * (zoomPositionY / 100);
                     
                     // 원형 마스크
                     ctx.save();
@@ -1747,13 +1753,17 @@
                             tempCtx.drawImage(designOriginal, x, y, width, height);
                         }
                         
-                        // 고화질 이미지에서 선택 영역 추출
+                        // 고화질 이미지에서 선택 영역 추출 (정사각형으로 크롭)
                         const scaleRatio = tempCanvas.width / canvas.width;
+                        const sourceSize = Math.min(zoomArea.width, zoomArea.height);
+                        const sourceX = zoomArea.x + (zoomArea.width - sourceSize) / 2;
+                        const sourceY = zoomArea.y + (zoomArea.height - sourceSize) / 2;
+                        
                         ctx.drawImage(tempCanvas,
-                            zoomArea.x * scaleRatio,
-                            zoomArea.y * scaleRatio,
-                            zoomArea.width * scaleRatio,
-                            zoomArea.height * scaleRatio,
+                            sourceX * scaleRatio,
+                            sourceY * scaleRatio,
+                            sourceSize * scaleRatio,
+                            sourceSize * scaleRatio,
                             zoomX, zoomY, zoomSize, zoomSize
                         );
                     } else {
@@ -1857,29 +1867,9 @@
                     if (addDetailZoom && zoomArea) {
                         const zoomSize = 400; // 원형 확대 크기
                         
-                        // 티셔츠 이미지 경계 계산
-                        let tshirtBounds = null;
-                        if (tshirt && tshirt.image) {
-                            const scale = Math.min(
-                                outputCanvas.width / tshirt.image.width,
-                                outputCanvas.height / tshirt.image.height
-                            ) * 0.9;
-                            
-                            const width = tshirt.image.width * scale;
-                            const height = tshirt.image.height * scale;
-                            const x = (outputCanvas.width - width) / 2;
-                            const y = (outputCanvas.height - height) / 2;
-                            
-                            tshirtBounds = { x, y, width, height };
-                        }
-                        
-                        // 티셔츠 경계 기준으로 위치 계산 (중간 높이)
-                        const zoomX = tshirtBounds ? 
-                            tshirtBounds.x + tshirtBounds.width - zoomSize - 80 : 
-                            outputWidth - zoomSize - 100;
-                        const zoomY = tshirtBounds ? 
-                            tshirtBounds.y + (tshirtBounds.height * 0.55) - (zoomSize / 2) : 
-                            outputHeight - zoomSize - 300;
+                        // 위치 조절 가능한 확대컷 위치 계산
+                        const zoomX = (outputWidth - zoomSize) * (zoomPositionX / 100);
+                        const zoomY = (outputHeight - zoomSize) * (zoomPositionY / 100);
                         
                         // 원형 클리핑
                         outputCtx.save();
@@ -1925,15 +1915,19 @@
                             tempCtx.drawImage(designOriginal, x, y, width, height);
                         }
                         
-                        // 선택 영역을 확대하여 그리기
+                        // 선택 영역을 확대하여 그리기 (정사각형으로 크롭)
                         const scaleRatio = outputCanvas.width / 600;
+                        const sourceSize = Math.min(zoomArea.width, zoomArea.height);
+                        const sourceX = zoomArea.x + (zoomArea.width - sourceSize) / 2;
+                        const sourceY = zoomArea.y + (zoomArea.height - sourceSize) / 2;
+                        
                         outputCtx.imageSmoothingEnabled = true;
                         outputCtx.imageSmoothingQuality = 'high';
                         outputCtx.drawImage(tempCanvas,
-                            zoomArea.x * scaleRatio,
-                            zoomArea.y * scaleRatio,
-                            zoomArea.width * scaleRatio,
-                            zoomArea.height * scaleRatio,
+                            sourceX * scaleRatio,
+                            sourceY * scaleRatio,
+                            sourceSize * scaleRatio,
+                            sourceSize * scaleRatio,
                             zoomX, zoomY, zoomSize, zoomSize
                         );
                         
@@ -1962,6 +1956,10 @@
                 
                 await downloadZip(files, 'OKSTAR_Front_Output');
             };
+            
+            // 초기 상태 설정 (위치 슬라이더 비활성화)
+            document.getElementById('frontZoomX').disabled = true;
+            document.getElementById('frontZoomY').disabled = true;
             
             // 초기 렌더링
             renderFront();
@@ -2112,13 +2110,6 @@
                     const y = state.position.y - height / 2;
                     
                     ctx.drawImage(data.design, x, y, width, height);
-                    
-                    ctx.strokeStyle = side === 'front' ? 
-                        'rgba(59, 130, 246, 0.3)' : 'rgba(139, 92, 246, 0.3)';
-                    ctx.lineWidth = 2;
-                    ctx.setLineDash([5, 5]);
-                    ctx.strokeRect(x, y, width, height);
-                    ctx.setLineDash([]);
                 }
             }
             
@@ -2272,7 +2263,10 @@
                 addDetailZoom: false,
                 zoomArea: null,
                 zoomLevel: 3,
-                selectingZoomArea: false
+                selectingZoomArea: false,
+                zoomPositionX: 85,  // 확대컷 가로 위치
+                zoomPositionY: 70,  // 확대컷 세로 위치
+                zoomFixed: true     // 확대컷 고정 상태
             };
             
             // 세트별 설정 초기화
@@ -2358,6 +2352,36 @@
             document.getElementById('bgRemoveSensitivity').addEventListener('input', (e) => {
                 combineState.bgSensitivity = parseInt(e.target.value);
                 document.getElementById('bgSensitivityValue').textContent = e.target.value;
+                renderCombine();
+            });
+            
+            // 고정/이동 버튼 이벤트
+            document.getElementById('combineZoomFixBtn').addEventListener('click', () => {
+                combineState.zoomFixed = true;
+                document.getElementById('combineZoomFixBtn').style.background = '#3b82f6';
+                document.getElementById('combineZoomMoveBtn').style.background = '#94a3b8';
+                document.getElementById('combineZoomX').disabled = true;
+                document.getElementById('combineZoomY').disabled = true;
+            });
+            
+            document.getElementById('combineZoomMoveBtn').addEventListener('click', () => {
+                combineState.zoomFixed = false;
+                document.getElementById('combineZoomMoveBtn').style.background = '#3b82f6';
+                document.getElementById('combineZoomFixBtn').style.background = '#94a3b8';
+                document.getElementById('combineZoomX').disabled = false;
+                document.getElementById('combineZoomY').disabled = false;
+            });
+            
+            // 위치 조절 슬라이더
+            document.getElementById('combineZoomX').addEventListener('input', (e) => {
+                combineState.zoomPositionX = parseInt(e.target.value);
+                document.getElementById('combineZoomXValue').textContent = combineState.zoomPositionX + '%';
+                renderCombine();
+            });
+            
+            document.getElementById('combineZoomY').addEventListener('input', (e) => {
+                combineState.zoomPositionY = parseInt(e.target.value);
+                document.getElementById('combineZoomYValue').textContent = combineState.zoomPositionY + '%';
                 renderCombine();
             });
             
@@ -2730,26 +2754,14 @@
                     ctx.fillRect(canvas.width-10, 0, 10, canvas.height);
                 }
                 
-                // 확대 영역 표시
+                // 확대 영역 표시 (선택 영역 박스는 표시하지 않음)
                 if (combineState.addDetailZoom && currentSet.zoomArea) {
                     const zoomSourceSize = 100 / combineState.zoomLevel;
                     
-                    // 선택 영역 표시
-                    ctx.strokeStyle = '#10b981';
-                    ctx.lineWidth = 2;
-                    ctx.setLineDash([5, 5]);
-                    ctx.strokeRect(
-                        currentSet.zoomArea.x - zoomSourceSize/2,
-                        currentSet.zoomArea.y - zoomSourceSize/2,
-                        zoomSourceSize,
-                        zoomSourceSize
-                    );
-                    ctx.setLineDash([]);
-                    
-                    // 확대 미리보기 (우측 하단)
+                    // 확대 미리보기 (위치 조절 가능)
                     const zoomSize = 150;
-                    const zoomX = canvas.width - zoomSize - 20;
-                    const zoomY = canvas.height - zoomSize - 20;
+                    const zoomX = (canvas.width - zoomSize) * (combineState.zoomPositionX / 100);
+                    const zoomY = (canvas.height - zoomSize) * (combineState.zoomPositionY / 100);
                     
                     ctx.save();
                     ctx.beginPath();
@@ -2760,12 +2772,13 @@
                     ctx.fillStyle = '#ffffff';
                     ctx.fillRect(zoomX, zoomY, zoomSize, zoomSize);
                     
-                    // 확대 이미지
+                    // 확대 이미지 (정사각형으로 크롭)
+                    const sourceSize = Math.min(100, 100) / combineState.zoomLevel;
                     ctx.drawImage(canvas,
-                        currentSet.zoomArea.x - zoomSourceSize/2,
-                        currentSet.zoomArea.y - zoomSourceSize/2,
-                        zoomSourceSize,
-                        zoomSourceSize,
+                        currentSet.zoomArea.x - sourceSize/2,
+                        currentSet.zoomArea.y - sourceSize/2,
+                        sourceSize,
+                        sourceSize,
                         zoomX, zoomY, zoomSize, zoomSize
                     );
                     
@@ -2840,8 +2853,8 @@
                     // 디테일 확대 추가
                     if (combineState.addDetailZoom && currentSet.zoomArea) {
                         const zoomSize = 400; // 원형 확대 크기
-                        const zoomX = outputWidth - zoomSize - 50; // 우측 여백 50px
-                        const zoomY = outputHeight - zoomSize - 50; // 하단 여백 50px
+                        const zoomX = (outputWidth - zoomSize) * (combineState.zoomPositionX / 100);
+                        const zoomY = (outputHeight - zoomSize) * (combineState.zoomPositionY / 100);
                         
                         // 원형 클리핑
                         saveCtx.save();
@@ -2926,6 +2939,10 @@
                     ctx.drawImage(image, x, y, width, height);
                 }
             };
+            
+            // 초기 상태 설정
+            document.getElementById('combineZoomX').disabled = true;
+            document.getElementById('combineZoomY').disabled = true;
             
             // 초기 렌더링
             renderCombine();
@@ -3024,13 +3041,6 @@
                 const y = state.position.y - height / 2;
                 
                 ctx.drawImage(data.design, x, y, width, height);
-                
-                ctx.strokeStyle = side === 'front' ? 
-                    'rgba(59, 130, 246, 0.3)' : 'rgba(139, 92, 246, 0.3)';
-                ctx.lineWidth = 2;
-                ctx.setLineDash([5, 5]);
-                ctx.strokeRect(x, y, width, height);
-                ctx.setLineDash([]);
             }
         }
 
