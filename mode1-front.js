@@ -479,10 +479,6 @@
         // 디테일 확대 표시
         if (mode1State.addDetailZoom && mode1State.detailSelectionRect) {
             const detailRect = mode1State.detailSelectionRect;
-            const detailX = detailRect.x + mode1State.detailOffsetX;
-            const detailY = detailRect.y + mode1State.detailOffsetY;
-            const detailWidth = detailRect.width;
-            const detailHeight = detailRect.height;
             
             // 확대 미리보기
             const zoomSize = 150;
@@ -501,25 +497,28 @@
             ctx.fillRect(zoomX, zoomY, zoomSize, zoomSize);
             
             // 고화질 렌더링을 위한 임시 캔버스
-            if (detailWidth > 0 && detailHeight > 0 && tshirt && tshirt.image && mode1State.designOriginal) {
-                // 고해상도 임시 캔버스 생성
+            if (detailRect.width > 0 && detailRect.height > 0 && tshirt && tshirt.image && mode1State.designOriginal) {
+                // 고해상도 임시 캔버스 생성 (저장과 동일한 크기)
                 const hdCanvas = document.createElement('canvas');
-                hdCanvas.width = 1500;
-                hdCanvas.height = 1500;
+                hdCanvas.width = window.outputWidth;
+                hdCanvas.height = window.outputHeight;
                 const hdCtx = hdCanvas.getContext('2d');
                 
                 // HD 캔버스에 고화질로 렌더링
                 renderForSave(hdCtx, hdCanvas, tshirt.image, mode1State.designOriginal);
                 
-                // HD 캔버스에서의 실제 좌표 계산
-                const hdScale = hdCanvas.width / canvas.width;
-                const hdX = detailX * hdScale;
-                const hdY = detailY * hdScale;
-                const hdWidth = detailWidth * hdScale;
-                const hdHeight = detailHeight * hdScale;
+                // 좌표 변환: 600x720 -> outputWidth x outputHeight
+                const xScale = window.outputWidth / 600;
+                const yScale = window.outputHeight / 720;
+                
+                // 오프셋 적용된 좌표
+                const hdX = (detailRect.x + mode1State.detailOffsetX) * xScale;
+                const hdY = (detailRect.y + mode1State.detailOffsetY) * yScale;
+                const hdWidth = detailRect.width * xScale;
+                const hdHeight = detailRect.height * yScale;
                 
                 // 원본 비율 계산
-                const aspectRatio = detailWidth / detailHeight;
+                const aspectRatio = detailRect.width / detailRect.height;
                 
                 // 원형 안에서 비율을 유지하면서 최대 크기 계산
                 let drawWidth, drawHeight, drawX, drawY;
@@ -673,10 +672,6 @@
             // 디테일 확대 추가
             if (mode1State.addDetailZoom && mode1State.detailSelectionRect && tshirt.image && mode1State.designOriginal) {
                 const detailRect = mode1State.detailSelectionRect;
-                const detailX = detailRect.x + mode1State.detailOffsetX;
-                const detailY = detailRect.y + mode1State.detailOffsetY;
-                const detailWidth = detailRect.width;
-                const detailHeight = detailRect.height;
                 
                 const zoomSize = 400;
                 const zoomX = (window.outputWidth - zoomSize) * (mode1State.zoomPositionX / 100);
@@ -701,16 +696,21 @@
                 outputCtx.fillStyle = '#ffffff';
                 outputCtx.fillRect(zoomX, zoomY, zoomSize, zoomSize);
                 
-                // 선택된 영역을 비율 유지하면서 확대
-                const scaleRatio = window.outputWidth / 600;
-                const sourceX = detailX * scaleRatio;
-                const sourceY = detailY * scaleRatio;
-                const sourceWidth = detailWidth * scaleRatio;
-                const sourceHeight = detailHeight * scaleRatio;
+                // 좌표 변환: 600x720 -> 1500x1500
+                // X축: 600 -> 1500 (2.5배)
+                // Y축: 720 -> 1500 (약 2.08배) - 비율이 다름!
+                const xScale = window.outputWidth / 600;
+                const yScale = window.outputHeight / 720;
+                
+                // 오프셋 적용된 좌표
+                const sourceX = (detailRect.x + mode1State.detailOffsetX) * xScale;
+                const sourceY = (detailRect.y + mode1State.detailOffsetY) * yScale;
+                const sourceWidth = detailRect.width * xScale;
+                const sourceHeight = detailRect.height * yScale;
                 
                 if (sourceWidth > 0 && sourceHeight > 0) {
                     // 원본 비율 계산
-                    const aspectRatio = sourceWidth / sourceHeight;
+                    const aspectRatio = detailRect.width / detailRect.height;
                     
                     // 원형 안에서 비율을 유지하면서 최대 크기 계산
                     let drawWidth, drawHeight, drawX, drawY;
