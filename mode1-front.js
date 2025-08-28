@@ -1,45 +1,47 @@
 // Mode 1: 앞판 전용 컴포넌트
 (function() {
     'use strict';
-    
+
     // Mode 1 상태 관리
     const mode1State = {
         tshirts: [],
         design: null,
         currentIndex: 0,
-        designPosition: { x: 300, y: 200 },
+        designPosition: { x: 0.5, y: 0.4 }, // 정규화된 상대 좌표 (0-1)
         designScale: 0.3,
         isDragging: false,
         dragStart: { x: 0, y: 0 },
-        
-        // 디테일 확대 설정
-        addDetailZoom: false,
-        zoomLevel: 3,
-        zoomPositionX: 85,
-        zoomPositionY: 70,
-        zoomFixed: true,
-        
-        // 디테일 영역 독립 제어
-        detailAreaCenter: { x: 300, y: 200 },  // 디테일 영역 중심점
-        detailOffsetX: 0,  // 디테일 영역 X 오프셋
-        detailOffsetY: 0,  // 디테일 영역 Y 오프셋
-        selectingDetailArea: false,
-        
-        // 드래그로 영역 선택
-        detailSelectionStart: null,
-        detailSelectionEnd: null,
-        detailSelectionRect: null,
-        
-        // 메인 디자인 잠금
         mainDesignLocked: false,
-        
-        // 원본 이미지 저장
-        designOriginal: null,
-        tshirtOriginal: null
+        thumbnail: {
+            enabled: true,
+            position: { x: 0.8, y: 0.2 }, // 정규화된 위치 (0-1)
+            zoomLevel: 3,
+            size: 150,
+            minSize: 100,
+            maxSize: 300,
+            border: 3
+        },
+        // 원본 이미지 하나로 통일
+        originalImages: {
+            design: null,
+            tshirts: []
+        },
+        // 메모리 관리를 위한 URL 추적
+        objectURLs: new Set()
     };
-    
+
     // HTML 템플릿
     const mode1HTML = `
+        <style>
+            .switch { position: relative; display: inline-block; width: 50px; height: 28px; }
+            .switch input { opacity: 0; width: 0; height: 0; }
+            .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; }
+            .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; }
+            input:checked + .slider { background-color: #2196F3; }
+            input:checked + .slider:before { transform: translateX(22px); }
+            .slider.round { border-radius: 28px; }
+            .slider.round:before { border-radius: 50%; }
+        </style>
         <div class="upload-grid single">
             <div class="upload-section">
                 <div class="section-title" style="color: #3b82f6;">
@@ -49,7 +51,7 @@
                     <div>
                         <input type="file" id="frontTshirtInput" accept="image/*" multiple>
                         <label for="frontTshirtInput" class="upload-label" id="frontTshirtLabel">
-                            📁 앞판 무지티셔츠 <br>
+                            📁 앞판 무지티셔츠<br>
                             <small>여러 색상 선택 가능</small>
                         </label>
                         <div class="file-list" id="frontTshirtList"></div>
@@ -89,100 +91,143 @@
             </div>
         </div>
 
-        <!-- 디테일 확대 컨트롤 개선 -->
+        <!-- 디테일 썸네일 컨트롤 -->
         <div class="detail-control-box">
             <div class="detail-control-section">
-                <div class="detail-control-title">🔍 디테일 확대 설정</div>
-                
-                <div style="margin-bottom: 15px;">
-                    <label style="font-weight: bold;">
-                        <input type="checkbox" id="frontAddDetailZoom" style="margin-right: 5px;">
-                        디테일 확대컷 추가
+                <div class="detail-control-title">🔍 디테일 썸네일</div>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+                    <label style="font-weight: bold;">썸네일 표시</label>
+                    <label class="switch">
+                        <input type="checkbox" id="thumbnailToggle" checked>
+                        <span class="slider round"></span>
                     </label>
                 </div>
-                
-                <div style="display: grid; grid-template-columns: 1fr; gap: 15px;">
-                    <div>
-                        <button id="frontSelectDetailArea" style="padding: 8px 12px; background: #10b981; color: white; border: none; border-radius: 5px; cursor: pointer; width: 100%;">
-                            🔍 확대 영역 선택
-                        </button>
-                    </div>
+                <div class="control-group">
+                    <span class="control-label">확대 배율:</span>
+                    <input type="range" id="thumbnailZoom" min="2" max="8" value="3">
+                    <span class="scale-value" id="thumbnailZoomValue">3x</span>
+                </div>
+                <div class="control-group">
+                    <span class="control-label">썸네일 크기:</span>
+                    <input type="range" id="thumbnailSize" min="100" max="300" value="150" step="10">
+                    <span class="scale-value" id="thumbnailSizeValue">150px</span>
                 </div>
             </div>
-            
             <div class="detail-control-section">
-                <div class="detail-control-title">🎯 확대 영역 미세조정 (독립 제어)</div>
-                
-                <div class="control-group">
-                    <span class="control-label">영역 X:</span>
-                    <input type="range" id="detailOffsetX" min="-50" max="50" value="0">
-                    <span class="scale-value" id="detailOffsetXValue">0px</span>
-                </div>
-                
-                <div class="control-group">
-                    <span class="control-label">영역 Y:</span>
-                    <input type="range" id="detailOffsetY" min="-50" max="50" value="0">
-                    <span class="scale-value" id="detailOffsetYValue">0px</span>
-                </div>
-                
-                <div style="text-align: center; margin-top: 10px;">
-                    <button id="resetDetailOffset" style="padding: 6px 12px; background: #94a3b8; color: white; border: none; border-radius: 5px; cursor: pointer;">
-                        ↻ 오프셋 초기화
-                    </button>
-                </div>
-            </div>
-            
-            <div class="detail-control-section">
-                <div class="detail-control-title">📍 확대컷 표시 위치</div>
-                
-                <div style="text-align: center; margin-bottom: 10px;">
-                    <button id="frontZoomFixBtn" style="padding: 6px 12px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 5px;">
-                        🔒 고정
-                    </button>
-                    <button id="frontZoomMoveBtn" style="padding: 6px 12px; background: #94a3b8; color: white; border: none; border-radius: 5px; cursor: pointer;">
-                        🔓 이동
-                    </button>
-                </div>
-                
+                <div class="detail-control-title">📍 썸네일 위치</div>
                 <div class="control-group">
                     <span class="control-label">가로:</span>
-                    <input type="range" id="frontZoomX" min="0" max="100" value="85" disabled>
-                    <span class="scale-value" id="frontZoomXValue">85%</span>
+                    <input type="range" id="thumbnailPosX" min="0" max="100" value="80">
+                    <span class="scale-value" id="thumbnailPosXValue">80%</span>
                 </div>
-                
                 <div class="control-group">
                     <span class="control-label">세로:</span>
-                    <input type="range" id="frontZoomY" min="0" max="100" value="70" disabled>
-                    <span class="scale-value" id="frontZoomYValue">70%</span>
+                    <input type="range" id="thumbnailPosY" min="0" max="100" value="20">
+                    <span class="scale-value" id="thumbnailPosYValue">20%</span>
+                </div>
+                <div style="text-align: center; margin-top: 10px;">
+                    <button id="thumbnailReset" style="padding: 5px 10px; background: #6366f1; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                        ↻ 위치 초기화
+                    </button>
                 </div>
             </div>
         </div>
     `;
-    
-    // 초기화 함수
+
+    // --- 헬퍼 함수 ---
+    function getTshirtDrawParams(canvas, tshirtImg) {
+        if (!tshirtImg) return null;
+        const scale = Math.min(canvas.width / tshirtImg.width, canvas.height / tshirtImg.height) * 0.9;
+        const width = tshirtImg.width * scale;
+        const height = tshirtImg.height * scale;
+        const x = (canvas.width - width) / 2;
+        const y = (canvas.height - height) / 2;
+        return { x, y, width, height };
+    }
+
+    function getDesignDrawParams(designImg, relPosition, designScale, tshirtDrawParams) {
+        if (!designImg || !tshirtDrawParams) return null;
+        
+        // 티셔츠 크기에 비례하여 디자인 크기 조정
+        // 기준: 600px 너비 캔버스에서 티셔츠 너비가 약 518px일 때를 기준으로 함
+        const baseCanvasWidth = 600;
+        const scaleFactor = tshirtDrawParams.width / (518.4 * (tshirtDrawParams.width / 518.4));
+        
+        // 캔버스 크기에 따른 비례 조정
+        const canvasScaleFactor = tshirtDrawParams.width / 518.4; // 기준 티셔츠 너비 대비 현재 티셔츠 너비
+        
+        const designWidth = designImg.width * designScale * canvasScaleFactor;
+        const designHeight = designImg.height * designScale * canvasScaleFactor;
+        
+        const absX = tshirtDrawParams.x + relPosition.x * tshirtDrawParams.width;
+        const absY = tshirtDrawParams.y + relPosition.y * tshirtDrawParams.height;
+
+        return { x: absX - designWidth / 2, y: absY - designHeight / 2, width: designWidth, height: designHeight };
+    }
+
+
+    // --- 초기화 ---
     function initMode1() {
+        console.log('[Mode1] Starting initialization...');
+        
         const container = document.getElementById('frontMode');
+        if (!container) {
+            console.error('[Mode1] ERROR: frontMode container not found');
+            return;
+        }
+        
+        console.log('[Mode1] Container found, injecting HTML...');
         container.innerHTML = mode1HTML;
         
+        // HTML 주입 후 엘리먼트 확인
+        const uploadSection = container.querySelector('.upload-section');
+        const fileInputs = container.querySelectorAll('input[type="file"]');
+        
+        console.log('[Mode1] Upload section found:', !!uploadSection);
+        console.log('[Mode1] File inputs found:', fileInputs.length);
+        
         const canvas = document.getElementById('frontCanvas');
+        if (!canvas) {
+            console.error('[Mode1] ERROR: frontCanvas not found after HTML injection');
+            console.log('[Mode1] Container HTML:', container.innerHTML.substring(0, 200));
+            return;
+        }
+        
+        console.log('[Mode1] Canvas found, setting up...');
         const ctx = canvas.getContext('2d');
         canvas.width = 600;
         canvas.height = 720;
         
-        // 이벤트 리스너 설정
         setupMode1Events(canvas, ctx);
         
-        // appState에 mode1State 연결
-        window.appState.modes.front = mode1State;
+        // appState 초기화 확인
+        if (!window.appState) {
+            console.log('[Mode1] Creating appState...');
+            window.appState = { modes: {} };
+        }
+        if (!window.appState.modes) {
+            window.appState.modes = {};
+        }
         
-        // 초기 렌더링
+        window.appState.modes.front = mode1State;
         renderFront(canvas, ctx);
+        
+        console.log('[Mode1] Initialization complete!');
     }
-    
-    // 이벤트 설정
+
+    // --- 이벤트 설정 ---
     function setupMode1Events(canvas, ctx) {
-        // 티셔츠 업로드
-        document.getElementById('frontTshirtInput').addEventListener('change', (e) => {
+        console.log('[Mode1] Setting up events...');
+        
+        // 파일 업로드 - 티셔츠
+        const tshirtInput = document.getElementById('frontTshirtInput');
+        if (!tshirtInput) {
+            console.error('[Mode1] ERROR: frontTshirtInput not found');
+            return;
+        }
+        
+        tshirtInput.addEventListener('change', (e) => {
+            console.log('[Mode1] T-shirt file selected:', e.target.files.length, 'files');
             const files = Array.from(e.target.files);
             mode1State.tshirts = [];
             mode1State.currentIndex = 0;
@@ -193,14 +238,8 @@
                 reader.onload = (event) => {
                     const img = new Image();
                     img.onload = () => {
-                        mode1State.tshirts.push({
-                            name: file.name.split('.')[0],
-                            image: img
-                        });
-                        
-                        if (loadedCount === 0) {
-                            mode1State.tshirtOriginal = img;
-                        }
+                        mode1State.tshirts.push({ name: file.name.split('.')[0], image: img });
+                        if (loadedCount === 0) mode1State.tshirtOriginal = img;
                         
                         loadedCount++;
                         if (loadedCount === files.length) {
@@ -216,394 +255,462 @@
             });
             
             document.getElementById('frontTshirtLabel').classList.add('uploaded');
-            document.getElementById('frontTshirtLabel').innerHTML = 
-                `✅ ${files.length}개 티셔츠<br><small>업로드 완료</small>`;
+            document.getElementById('frontTshirtLabel').innerHTML = `✅ ${files.length}개 티셔츠<br><small>업로드 완료</small>`;
         });
+
+        // 파일 업로드 - 디자인
+        const designInput = document.getElementById('frontDesignInput');
+        if (!designInput) {
+            console.error('[Mode1] ERROR: frontDesignInput not found');
+            return;
+        }
         
-        // 디자인 업로드
-        document.getElementById('frontDesignInput').addEventListener('change', (e) => {
+        designInput.addEventListener('change', (e) => {
+            console.log('[Mode1] Design file selected');
             const file = e.target.files[0];
             if (!file) return;
             
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const img = new Image();
-                img.onload = () => {
-                    mode1State.design = img;
-                    mode1State.designOriginal = img;
-                    renderFront(canvas, ctx);
-                    window.updateSaveButton();
+            try {
+                // 파일 검증
+                if (window.TDesignUtils) {
+                    window.TDesignUtils.Validator.validateImageFile(file);
+                }
+                
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    
+                    // 에러 처리 추가
+                    img.onload = () => {
+                        try {
+                            mode1State.design = img;
+                            mode1State.originalImages.design = img; // 원본 통일
+                            renderFront(canvas, ctx);
+                            window.updateSaveButton();
+                        } catch (error) {
+                            console.error('Design processing error:', error);
+                            alert('디자인 처리 중 오류가 발생했습니다.');
+                        }
+                    };
+                    
+                    img.onerror = () => {
+                        console.error('Design image load failed');
+                        alert('디자인 이미지를 불러올 수 없습니다.');
+                    };
+                    
+                    img.src = event.target.result;
                 };
-                img.src = event.target.result;
-            };
-            reader.readAsDataURL(file);
-            
-            document.getElementById('frontDesignLabel').classList.add('uploaded');
-            document.getElementById('frontDesignLabel').innerHTML = 
-                `✅ 디자인<br><small>${file.name}</small>`;
+                
+                reader.onerror = () => {
+                    console.error('File read error');
+                    alert('파일을 읽을 수 없습니다.');
+                };
+                
+                reader.readAsDataURL(file);
+                
+                document.getElementById('frontDesignLabel').classList.add('uploaded');
+                document.getElementById('frontDesignLabel').textContent = `✅ 디자인: ${file.name}`;
+            } catch (error) {
+                alert(error.message);
+            }
         });
-        
-        // 크기 조절
+
+        // 컨트롤
         document.getElementById('frontScale').addEventListener('input', (e) => {
             mode1State.designScale = e.target.value / 100;
             document.getElementById('frontScaleValue').textContent = e.target.value + '%';
             renderFront(canvas, ctx);
         });
-        
-        // 메인 디자인 잠금
+
         document.getElementById('mainDesignLock').addEventListener('change', (e) => {
             mode1State.mainDesignLocked = e.target.checked;
             canvas.style.cursor = e.target.checked ? 'default' : 'move';
         });
-        
-        // 디테일 확대 체크박스
-        document.getElementById('frontAddDetailZoom').addEventListener('change', (e) => {
-            mode1State.addDetailZoom = e.target.checked;
+
+        // 썸네일 컨트롤
+        document.getElementById('thumbnailToggle').addEventListener('change', (e) => {
+            mode1State.thumbnail.enabled = e.target.checked;
             renderFront(canvas, ctx);
         });
-        
-        // 디테일 영역 선택
-        document.getElementById('frontSelectDetailArea').addEventListener('click', () => {
-            mode1State.selectingDetailArea = true;
-            mode1State.detailSelectionStart = null;
-            mode1State.detailSelectionEnd = null;
-            canvas.style.cursor = 'crosshair';
-            alert('확대할 영역을 드래그하여 선택하세요');
-        });
-        
-        // 디테일 오프셋 조절
-        document.getElementById('detailOffsetX').addEventListener('input', (e) => {
-            mode1State.detailOffsetX = parseInt(e.target.value);
-            document.getElementById('detailOffsetXValue').textContent = e.target.value + 'px';
+
+        document.getElementById('thumbnailZoom').addEventListener('input', (e) => {
+            mode1State.thumbnail.zoomLevel = parseInt(e.target.value);
+            document.getElementById('thumbnailZoomValue').textContent = e.target.value + 'x';
             renderFront(canvas, ctx);
         });
-        
-        document.getElementById('detailOffsetY').addEventListener('input', (e) => {
-            mode1State.detailOffsetY = parseInt(e.target.value);
-            document.getElementById('detailOffsetYValue').textContent = e.target.value + 'px';
+
+        // 썸네일 크기 조절
+        document.getElementById('thumbnailSize').addEventListener('input', (e) => {
+            mode1State.thumbnail.size = parseInt(e.target.value);
+            document.getElementById('thumbnailSizeValue').textContent = e.target.value + 'px';
             renderFront(canvas, ctx);
         });
-        
-        // 오프셋 초기화
-        document.getElementById('resetDetailOffset').addEventListener('click', () => {
-            mode1State.detailOffsetX = 0;
-            mode1State.detailOffsetY = 0;
-            document.getElementById('detailOffsetX').value = 0;
-            document.getElementById('detailOffsetY').value = 0;
-            document.getElementById('detailOffsetXValue').textContent = '0px';
-            document.getElementById('detailOffsetYValue').textContent = '0px';
+
+        // 썸네일 위치 슬라이더
+        document.getElementById('thumbnailPosX').addEventListener('input', (e) => {
+            const value = e.target.value / 100;
+            mode1State.thumbnail.position.x = value;
+            document.getElementById('thumbnailPosXValue').textContent = e.target.value + '%';
             renderFront(canvas, ctx);
         });
-        
-        // 확대컷 위치 고정/이동
-        document.getElementById('frontZoomFixBtn').addEventListener('click', () => {
-            mode1State.zoomFixed = true;
-            document.getElementById('frontZoomFixBtn').style.background = '#3b82f6';
-            document.getElementById('frontZoomMoveBtn').style.background = '#94a3b8';
-            document.getElementById('frontZoomX').disabled = true;
-            document.getElementById('frontZoomY').disabled = true;
-        });
-        
-        document.getElementById('frontZoomMoveBtn').addEventListener('click', () => {
-            mode1State.zoomFixed = false;
-            document.getElementById('frontZoomMoveBtn').style.background = '#3b82f6';
-            document.getElementById('frontZoomFixBtn').style.background = '#94a3b8';
-            document.getElementById('frontZoomX').disabled = false;
-            document.getElementById('frontZoomY').disabled = false;
-        });
-        
-        // 확대컷 위치 슬라이더
-        document.getElementById('frontZoomX').addEventListener('input', (e) => {
-            mode1State.zoomPositionX = parseInt(e.target.value);
-            document.getElementById('frontZoomXValue').textContent = e.target.value + '%';
+
+        document.getElementById('thumbnailPosY').addEventListener('input', (e) => {
+            const value = e.target.value / 100;
+            mode1State.thumbnail.position.y = value;
+            document.getElementById('thumbnailPosYValue').textContent = e.target.value + '%';
             renderFront(canvas, ctx);
         });
-        
-        document.getElementById('frontZoomY').addEventListener('input', (e) => {
-            mode1State.zoomPositionY = parseInt(e.target.value);
-            document.getElementById('frontZoomYValue').textContent = e.target.value + '%';
+
+        // 위치 초기화 버튼
+        document.getElementById('thumbnailReset').addEventListener('click', () => {
+            mode1State.thumbnail.position = { x: 0.8, y: 0.2 };
+            mode1State.thumbnail.size = 150;
+            document.getElementById('thumbnailPosX').value = 80;
+            document.getElementById('thumbnailPosY').value = 20;
+            document.getElementById('thumbnailPosXValue').textContent = '80%';
+            document.getElementById('thumbnailPosYValue').textContent = '20%';
+            document.getElementById('thumbnailSize').value = 150;
+            document.getElementById('thumbnailSizeValue').textContent = '150px';
             renderFront(canvas, ctx);
         });
-        
+
         // 캔버스 마우스 이벤트
         canvas.addEventListener('mousedown', (e) => {
+            if (mode1State.mainDesignLocked || !mode1State.design) return;
+
             const rect = canvas.getBoundingClientRect();
-            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-            
-            // 디테일 영역 선택 모드
-            if (mode1State.selectingDetailArea) {
-                mode1State.detailSelectionStart = { x, y };
-                mode1State.detailSelectionEnd = null;
-                return;
-            }
-            
-            // 메인 디자인 잠금 상태면 드래그 안함
-            if (mode1State.mainDesignLocked) return;
-            
-            if (!mode1State.design) return;
-            
-            const width = mode1State.design.width * mode1State.designScale * 0.5;
-            const height = mode1State.design.height * mode1State.designScale * 0.5;
-            
-            if (x >= mode1State.designPosition.x - width/2 && 
-                x <= mode1State.designPosition.x + width/2 &&
-                y >= mode1State.designPosition.y - height/2 && 
-                y <= mode1State.designPosition.y + height/2) {
+            const canvasX = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const canvasY = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+            const tshirt = mode1State.tshirts[mode1State.currentIndex];
+            const tshirtDrawParams = getTshirtDrawParams(canvas, tshirt?.image);
+            if (!tshirtDrawParams) return;
+
+            const designDrawParams = getDesignDrawParams(mode1State.design, mode1State.designPosition, mode1State.designScale, tshirtDrawParams);
+            if (!designDrawParams) return;
+
+            if (canvasX >= designDrawParams.x && canvasX <= designDrawParams.x + designDrawParams.width &&
+                canvasY >= designDrawParams.y && canvasY <= designDrawParams.y + designDrawParams.height) {
                 mode1State.isDragging = true;
-                mode1State.dragStart = { x, y };
+                mode1State.dragStart = { x: canvasX, y: canvasY };
                 canvas.style.cursor = 'grabbing';
             }
         });
-        
+
         canvas.addEventListener('mousemove', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-            
-            // 디테일 영역 선택 중
-            if (mode1State.selectingDetailArea && mode1State.detailSelectionStart) {
-                mode1State.detailSelectionEnd = { x, y };
-                renderFront(canvas, ctx);
-                return;
-            }
-            
             if (!mode1State.isDragging || mode1State.mainDesignLocked) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const canvasX = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const canvasY = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+            const deltaX = canvasX - mode1State.dragStart.x;
+            const deltaY = canvasY - mode1State.dragStart.y;
+
+            const tshirt = mode1State.tshirts[mode1State.currentIndex];
+            const tshirtDrawParams = getTshirtDrawParams(canvas, tshirt?.image);
+            if (!tshirtDrawParams) return;
+
+            // 상대 좌표 업데이트
+            mode1State.designPosition.x += deltaX / tshirtDrawParams.width;
+            mode1State.designPosition.y += deltaY / tshirtDrawParams.height;
             
-            mode1State.designPosition.x += x - mode1State.dragStart.x;
-            mode1State.designPosition.y += y - mode1State.dragStart.y;
-            mode1State.dragStart = { x, y };
-            
-            // 디테일 영역도 함께 이동 (기본 동작)
-            if (!mode1State.addDetailZoom) {
-                mode1State.detailAreaCenter = { 
-                    x: mode1State.designPosition.x, 
-                    y: mode1State.designPosition.y 
-                };
-            }
-            
+            // 경계 제한
+            mode1State.designPosition.x = Math.max(0, Math.min(1, mode1State.designPosition.x));
+            mode1State.designPosition.y = Math.max(0, Math.min(1, mode1State.designPosition.y));
+
+            mode1State.dragStart = { x: canvasX, y: canvasY };
             renderFront(canvas, ctx);
         });
-        
-        canvas.addEventListener('mouseup', (e) => {
-            // 디테일 영역 선택 완료
-            if (mode1State.selectingDetailArea && mode1State.detailSelectionStart && mode1State.detailSelectionEnd) {
-                const startX = mode1State.detailSelectionStart.x;
-                const startY = mode1State.detailSelectionStart.y;
-                const endX = mode1State.detailSelectionEnd.x;
-                const endY = mode1State.detailSelectionEnd.y;
-                
-                // 선택된 영역의 중심점과 크기 계산
-                const centerX = (startX + endX) / 2;
-                const centerY = (startY + endY) / 2;
-                const width = Math.abs(endX - startX);
-                const height = Math.abs(endY - startY);
-                
-                // 선택된 영역 저장
-                mode1State.detailAreaCenter = { x: centerX, y: centerY };
-                mode1State.detailSelectionRect = { 
-                    x: Math.min(startX, endX),
-                    y: Math.min(startY, endY),
-                    width: width,
-                    height: height
-                };
-                
-                mode1State.selectingDetailArea = false;
-                mode1State.detailSelectionStart = null;
-                mode1State.detailSelectionEnd = null;
-                canvas.style.cursor = mode1State.mainDesignLocked ? 'default' : 'move';
-                renderFront(canvas, ctx);
-                return;
-            }
-            
+
+        canvas.addEventListener('mouseup', () => {
             mode1State.isDragging = false;
-            if (!mode1State.mainDesignLocked) {
-                canvas.style.cursor = 'move';
-            }
+            canvas.style.cursor = mode1State.mainDesignLocked ? 'default' : 'move';
         });
     }
-    
-    // 메인 렌더링 함수
+
+    // --- 렌더링 ---
     function renderFront(canvas, ctx) {
+        // 렌더링 품질 설정
+        if (window.TDesignUtils) {
+            window.TDesignUtils.RenderQuality.setHighQuality(ctx);
+        } else {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+        }
+        
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#f8fafc';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // 티셔츠 렌더링
+
         const tshirt = mode1State.tshirts[mode1State.currentIndex];
-        if (tshirt && tshirt.image) {
-            const scale = Math.min(
-                canvas.width / tshirt.image.width,
-                canvas.height / tshirt.image.height
-            ) * 0.9;
-            
-            const width = tshirt.image.width * scale;
-            const height = tshirt.image.height * scale;
-            const x = (canvas.width - width) / 2;
-            const y = (canvas.height - height) / 2;
-            
-            ctx.drawImage(tshirt.image, x, y, width, height);
-            mode1State.tshirtOriginal = tshirt.image;
-        }
+        const tshirtDrawParams = getTshirtDrawParams(canvas, tshirt?.image);
         
-        // 디자인 렌더링
+        if (tshirtDrawParams) {
+            ctx.drawImage(tshirt.image, tshirtDrawParams.x, tshirtDrawParams.y, tshirtDrawParams.width, tshirtDrawParams.height);
+        }
+
         if (mode1State.design) {
-            const width = mode1State.design.width * mode1State.designScale * 0.5;
-            const height = mode1State.design.height * mode1State.designScale * 0.5;
-            const x = mode1State.designPosition.x - width / 2;
-            const y = mode1State.designPosition.y - height / 2;
-            
-            ctx.drawImage(mode1State.design, x, y, width, height);
+            const designDrawParams = getDesignDrawParams(mode1State.design, mode1State.designPosition, mode1State.designScale, tshirtDrawParams);
+            if (designDrawParams) {
+                ctx.drawImage(mode1State.design, designDrawParams.x, designDrawParams.y, designDrawParams.width, designDrawParams.height);
+            }
         }
+
+        if (mode1State.thumbnail.enabled) {
+            renderDetailThumbnail(canvas, ctx);
+        }
+    }
+
+    function renderDetailThumbnail(canvas, ctx) {
+        try {
+            const { size, zoomLevel, position, border } = mode1State.thumbnail;
+            const halfSize = size / 2;
+            
+            // 품질 설정
+            if (window.TDesignUtils) {
+                window.TDesignUtils.RenderQuality.setHighQuality(ctx);
+            } else {
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+            }
+            
+            // 티셔츠 영역 계산
+            const tshirt = mode1State.tshirts[mode1State.currentIndex];
+            if (!tshirt) return;
+            
+            const tshirtDrawParams = getTshirtDrawParams(canvas, tshirt.image);
+            if (!tshirtDrawParams) return;
+            
+            // 썸네일 위치를 티셔츠 영역 내로 제한
+            // position은 0-1 정규화된 값
+            const maxX = tshirtDrawParams.x + tshirtDrawParams.width - size - border;
+            const minX = tshirtDrawParams.x + border;
+            const maxY = tshirtDrawParams.y + tshirtDrawParams.height - size - border;
+            const minY = tshirtDrawParams.y + border;
+            
+            // 정규화된 위치를 실제 픽셀로 변환
+            let thumbX = minX + (maxX - minX) * position.x;
+            let thumbY = minY + (maxY - minY) * position.y;
+            
+            // 경계 체크
+            thumbX = Math.max(minX, Math.min(maxX, thumbX));
+            thumbY = Math.max(minY, Math.min(maxY, thumbY));
+
+            ctx.save();
+            // 썸네일 영역 클리핑
+            ctx.beginPath();
+            ctx.arc(thumbX + halfSize, thumbY + halfSize, halfSize, 0, Math.PI * 2);
+            ctx.clip();
+
+            // 썸네일 배경
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(thumbX, thumbY, size, size);
+
+            // 고화질 썸네일을 위해 고해상도 렌더링
+            if (!mode1State.design || !tshirt) { ctx.restore(); return; }
         
-        // 드래그 중인 선택 영역 표시
-        if (mode1State.selectingDetailArea && mode1State.detailSelectionStart && mode1State.detailSelectionEnd) {
-            ctx.strokeStyle = 'rgba(59, 130, 246, 0.5)';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([5, 5]);
+            // 디자인 위치 계산
+            const designDrawParams = getDesignDrawParams(mode1State.design, mode1State.designPosition, mode1State.designScale, tshirtDrawParams);
+            if (!designDrawParams) { ctx.restore(); return; }
             
-            const startX = mode1State.detailSelectionStart.x;
-            const startY = mode1State.detailSelectionStart.y;
-            const endX = mode1State.detailSelectionEnd.x;
-            const endY = mode1State.detailSelectionEnd.y;
+            const centerX = designDrawParams.x + designDrawParams.width / 2;
+            const centerY = designDrawParams.y + designDrawParams.height / 2;
             
-            ctx.strokeRect(
-                Math.min(startX, endX),
-                Math.min(startY, endY),
-                Math.abs(endX - startX),
-                Math.abs(endY - startY)
+            // 고해상도 임시 캔버스 생성 (4배 해상도)
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            const highResScale = 4; // 4배 고해상도
+            tempCanvas.width = size * highResScale;
+            tempCanvas.height = size * highResScale;
+            
+            tempCtx.imageSmoothingEnabled = true;
+            tempCtx.imageSmoothingQuality = 'high';
+            
+            // 배경
+            tempCtx.fillStyle = '#ffffff';
+            tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+            
+            // 확대 렌더링
+            tempCtx.save();
+            tempCtx.translate(tempCanvas.width / 2, tempCanvas.height / 2);
+            tempCtx.scale(zoomLevel * highResScale, zoomLevel * highResScale);
+            tempCtx.translate(-centerX, -centerY);
+            
+            // 티셔츠 그리기
+            tempCtx.drawImage(tshirt.image, tshirtDrawParams.x, tshirtDrawParams.y, tshirtDrawParams.width, tshirtDrawParams.height);
+            
+            // 디자인 그리기 (원본 이미지 사용)
+            const originalDesign = mode1State.originalImages.design || mode1State.design;
+            tempCtx.drawImage(originalDesign, designDrawParams.x, designDrawParams.y, designDrawParams.width, designDrawParams.height);
+            
+            tempCtx.restore();
+            
+            // 고해상도를 썸네일 크기로 축소하여 그리기 (안티앨리어싱 효과)
+            ctx.drawImage(
+                tempCanvas,
+                0, 0, tempCanvas.width, tempCanvas.height,
+                thumbX, thumbY, size, size
             );
-            ctx.setLineDash([]);
-        }
-        
-        // 디테일 확대 표시
-        if (mode1State.addDetailZoom && mode1State.detailSelectionRect) {
-            const detailRect = mode1State.detailSelectionRect;
+
+            ctx.restore();
+
+            // 썸네일 테두리 (흰색)
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = border;
+            ctx.beginPath();
+            ctx.arc(thumbX + halfSize, thumbY + halfSize, halfSize, 0, Math.PI * 2);
+            ctx.stroke();
             
-            // 확대 미리보기
-            const zoomSize = 150;
-            const zoomX = (canvas.width - zoomSize) * (mode1State.zoomPositionX / 100);
-            const zoomY = (canvas.height - zoomSize) * (mode1State.zoomPositionY / 100);
+            // 외곽선 추가 (선명하게)
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(thumbX + halfSize, thumbY + halfSize, halfSize + border/2, 0, Math.PI * 2);
+            ctx.stroke();
+        } catch (error) {
+            console.error('Thumbnail render error:', error);
+            // 썸네일 실패해도 메인 렌더링은 계속됨
+        }
+    }
+
+    // 저장용 썸네일 렌더링 함수
+    function renderDetailThumbnailForSave(canvas, ctx, tshirtImg, designImg) {
+        if (!tshirtImg || !designImg) return;
+        
+        try {
+            const { size, zoomLevel, position, border } = mode1State.thumbnail;
+            const halfSize = size / 2;
+            
+            // 저장 캔버스에 맞게 스케일 조정
+            const scaleRatio = canvas.width / 600; // 600은 미리보기 캔버스 너비
+            const scaledSize = size * scaleRatio;
+            const scaledHalfSize = scaledSize / 2;
+            const scaledBorder = border * scaleRatio;
+            
+            // 품질 설정
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            
+            // 티셔츠 영역 계산
+            const tshirtDrawParams = getTshirtDrawParams(canvas, tshirtImg);
+            if (!tshirtDrawParams) return;
+            
+            // 썸네일 위치 계산 (정규화된 위치 사용)
+            const maxX = tshirtDrawParams.x + tshirtDrawParams.width - scaledSize - scaledBorder;
+            const minX = tshirtDrawParams.x + scaledBorder;
+            const maxY = tshirtDrawParams.y + tshirtDrawParams.height - scaledSize - scaledBorder;
+            const minY = tshirtDrawParams.y + scaledBorder;
+            
+            let thumbX = minX + (maxX - minX) * position.x;
+            let thumbY = minY + (maxY - minY) * position.y;
+            
+            // 경계 체크
+            thumbX = Math.max(minX, Math.min(maxX, thumbX));
+            thumbY = Math.max(minY, Math.min(maxY, thumbY));
             
             ctx.save();
             
-            // 원형 클리핑 영역 설정
+            // 원형 클리핑
             ctx.beginPath();
-            ctx.arc(zoomX + zoomSize/2, zoomY + zoomSize/2, zoomSize/2, 0, Math.PI * 2);
+            ctx.arc(thumbX + scaledHalfSize, thumbY + scaledHalfSize, scaledHalfSize, 0, Math.PI * 2);
             ctx.clip();
             
             // 흰색 배경
             ctx.fillStyle = '#ffffff';
-            ctx.fillRect(zoomX, zoomY, zoomSize, zoomSize);
+            ctx.fillRect(thumbX, thumbY, scaledSize, scaledSize);
             
-            // 고화질 렌더링을 위한 임시 캔버스
-            if (detailRect.width > 0 && detailRect.height > 0 && tshirt && tshirt.image && mode1State.designOriginal) {
-                // 고해상도 임시 캔버스 생성 (저장과 동일한 크기)
-                const hdCanvas = document.createElement('canvas');
-                hdCanvas.width = window.outputWidth;
-                hdCanvas.height = window.outputHeight;
-                const hdCtx = hdCanvas.getContext('2d');
-                
-                // HD 캔버스에 고화질로 렌더링
-                renderForSave(hdCtx, hdCanvas, tshirt.image, mode1State.designOriginal);
-                
-                // 좌표 변환: 600x720 -> outputWidth x outputHeight
-                const xScale = window.outputWidth / 600;
-                const yScale = window.outputHeight / 720;
-                
-                // 오프셋 적용된 좌표
-                const hdX = (detailRect.x + mode1State.detailOffsetX) * xScale;
-                const hdY = (detailRect.y + mode1State.detailOffsetY) * yScale;
-                const hdWidth = detailRect.width * xScale;
-                const hdHeight = detailRect.height * yScale;
-                
-                // 원본 비율 계산
-                const aspectRatio = detailRect.width / detailRect.height;
-                
-                // 원형 안에서 비율을 유지하면서 최대 크기 계산
-                let drawWidth, drawHeight, drawX, drawY;
-                
-                if (aspectRatio > 1) {
-                    drawWidth = zoomSize;
-                    drawHeight = zoomSize / aspectRatio;
-                    drawX = zoomX;
-                    drawY = zoomY + (zoomSize - drawHeight) / 2;
-                } else {
-                    drawHeight = zoomSize;
-                    drawWidth = zoomSize * aspectRatio;
-                    drawX = zoomX + (zoomSize - drawWidth) / 2;
-                    drawY = zoomY;
-                }
-                
-                // 고화질 소스에서 확대 영역 추출
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = 'high';
-                ctx.drawImage(
-                    hdCanvas,
-                    hdX,
-                    hdY,
-                    hdWidth,
-                    hdHeight,
-                    drawX,
-                    drawY,
-                    drawWidth,
-                    drawHeight
-                );
-            }
+            // 고화질 썸네일을 위한 임시 캔버스 (4배 해상도)
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            const highResScale = 4;
+            tempCanvas.width = scaledSize * highResScale;
+            tempCanvas.height = scaledSize * highResScale;
+            
+            tempCtx.imageSmoothingEnabled = true;
+            tempCtx.imageSmoothingQuality = 'high';
+            tempCtx.fillStyle = '#ffffff';
+            tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+            
+            // 디자인 위치 계산
+            const designDrawParams = getDesignDrawParams(designImg, mode1State.designPosition, mode1State.designScale, tshirtDrawParams);
+            if (!designDrawParams) { ctx.restore(); return; }
+            
+            const centerX = designDrawParams.x + designDrawParams.width / 2;
+            const centerY = designDrawParams.y + designDrawParams.height / 2;
+            
+            // 고해상도로 확대 렌더링 (highResScale은 이미 위에서 선언됨)
+            
+            tempCtx.save();
+            tempCtx.translate(tempCanvas.width / 2, tempCanvas.height / 2);
+            tempCtx.scale(zoomLevel * highResScale, zoomLevel * highResScale);
+            tempCtx.translate(-centerX, -centerY);
+            
+            // 티셔츠 그리기
+            tempCtx.drawImage(tshirtImg, tshirtDrawParams.x, tshirtDrawParams.y, tshirtDrawParams.width, tshirtDrawParams.height);
+            
+            // 디자인 그리기 (고화질)
+            tempCtx.drawImage(designImg, designDrawParams.x, designDrawParams.y, designDrawParams.width, designDrawParams.height);
+            
+            tempCtx.restore();
+            
+            // 메인 캔버스에 그리기
+            ctx.drawImage(tempCanvas, 0, 0, tempCanvas.width, tempCanvas.height, thumbX, thumbY, scaledSize, scaledSize);
             
             ctx.restore();
             
-            // 원형 테두리
+            // 흰색 테두리
             ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 3;
+            ctx.lineWidth = scaledBorder;
             ctx.beginPath();
-            ctx.arc(zoomX + zoomSize/2, zoomY + zoomSize/2, zoomSize/2, 0, Math.PI * 2);
+            ctx.arc(thumbX + scaledHalfSize, thumbY + scaledHalfSize, scaledHalfSize, 0, Math.PI * 2);
             ctx.stroke();
+            
+            // 외곽선
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(thumbX + scaledHalfSize, thumbY + scaledHalfSize, scaledHalfSize + scaledBorder/2, 0, Math.PI * 2);
+            ctx.stroke();
+            
+        } catch (error) {
+            console.error('Save thumbnail render error:', error);
         }
     }
     
-    // 고화질 저장용 렌더링 함수
-    function renderForSave(ctx, canvas, tshirtImg, designImg) {
-        // 캔버스 클리어
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // 스케일 비율 계산
-        const scaleRatio = canvas.width / 600;
-        
-        // 티셔츠 렌더링
-        if (tshirtImg) {
-            const scale = Math.min(
-                canvas.width / tshirtImg.width,
-                canvas.height / tshirtImg.height
-            ) * 0.9;
-            
-            const width = tshirtImg.width * scale;
-            const height = tshirtImg.height * scale;
-            const x = (canvas.width - width) / 2;
-            const y = (canvas.height - height) / 2;
-            
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            ctx.drawImage(tshirtImg, x, y, width, height);
+    function renderHighQuality(ctx, canvas, tshirtImg, designImg) {
+        // 항상 고품질 설정 적용
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        const tshirtDrawParams = getTshirtDrawParams(canvas, tshirtImg);
+        if (tshirtDrawParams) {
+            ctx.drawImage(tshirtImg, tshirtDrawParams.x, tshirtDrawParams.y, tshirtDrawParams.width, tshirtDrawParams.height);
         }
-        
-        // 디자인 렌더링
+
         if (designImg) {
-            const width = designImg.width * mode1State.designScale * scaleRatio * 0.5;
-            const height = designImg.height * mode1State.designScale * scaleRatio * 0.5;
+            // 미리보기와 동일한 디자인 파라미터 계산
+            const designDrawParams = getDesignDrawParams(
+                designImg, 
+                mode1State.designPosition, 
+                mode1State.designScale, 
+                tshirtDrawParams
+            );
             
-            const x = (mode1State.designPosition.x * scaleRatio) - width / 2;
-            const y = (mode1State.designPosition.y * scaleRatio) - height / 2;
-            
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            ctx.drawImage(designImg, x, y, width, height);
+            if (designDrawParams) {
+                // 디자인 그리기 (미리보기와 동일하게)
+                ctx.drawImage(
+                    designImg,
+                    designDrawParams.x,
+                    designDrawParams.y,
+                    designDrawParams.width,
+                    designDrawParams.height
+                );
+            }
         }
     }
-    
-    // 탭 업데이트
+
+    // --- UI 업데이트 ---
     function updateFrontTabs() {
         const tabs = document.getElementById('frontTabs');
         tabs.innerHTML = '';
@@ -629,12 +736,10 @@
             tabs.appendChild(button);
         });
     }
-    
-    // 파일 리스트 업데이트
+
     function updateFrontFileList() {
         const list = document.getElementById('frontTshirtList');
         list.innerHTML = '';
-        
         mode1State.tshirts.forEach(tshirt => {
             const item = document.createElement('div');
             item.className = 'file-item';
@@ -642,8 +747,8 @@
             list.appendChild(item);
         });
     }
-    
-    // 저장 가능 체크
+
+    // --- 저장 ---
     window.checkModeFrontReady = function() {
         if (mode1State.tshirts.length > 0 && mode1State.design) {
             return {
@@ -653,107 +758,31 @@
         }
         return { ready: false, text: '파일을 업로드하세요' };
     };
-    
-    // 저장 함수
+
     window.saveModeFront = async function() {
         const files = [];
-        
+        const originalThumbnailState = mode1State.thumbnail.enabled;
+        mode1State.thumbnail.enabled = false; // 저장 시 썸네일 끄기
+
         for (let i = 0; i < mode1State.tshirts.length; i++) {
             const outputCanvas = document.createElement('canvas');
             const outputCtx = outputCanvas.getContext('2d');
             outputCanvas.width = window.outputWidth;
             outputCanvas.height = window.outputHeight;
             
+            outputCtx.fillStyle = '#ffffff';
+            outputCtx.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
+            
             const tshirt = mode1State.tshirts[i];
-            
-            // 메인 이미지 렌더링
-            renderForSave(outputCtx, outputCanvas, tshirt.image, mode1State.designOriginal);
-            
-            // 디테일 확대 추가
-            if (mode1State.addDetailZoom && mode1State.detailSelectionRect && tshirt.image && mode1State.designOriginal) {
-                const detailRect = mode1State.detailSelectionRect;
-                
-                const zoomSize = 400;
-                const zoomX = (window.outputWidth - zoomSize) * (mode1State.zoomPositionX / 100);
-                const zoomY = (window.outputHeight - zoomSize) * (mode1State.zoomPositionY / 100);
-                
-                // 임시 캔버스 생성하여 완전한 이미지 렌더링
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = window.outputWidth;
-                tempCanvas.height = window.outputHeight;
-                const tempCtx = tempCanvas.getContext('2d');
-                
-                // 임시 캔버스에 티셔츠 + 디자인 렌더링
-                renderForSave(tempCtx, tempCanvas, tshirt.image, mode1State.designOriginal);
-                
-                // 원형 클리핑 영역 설정
-                outputCtx.save();
-                outputCtx.beginPath();
-                outputCtx.arc(zoomX + zoomSize/2, zoomY + zoomSize/2, zoomSize/2, 0, Math.PI * 2);
-                outputCtx.clip();
-                
-                // 흰색 배경
-                outputCtx.fillStyle = '#ffffff';
-                outputCtx.fillRect(zoomX, zoomY, zoomSize, zoomSize);
-                
-                // 좌표 변환: 600x720 -> 1500x1500
-                // X축: 600 -> 1500 (2.5배)
-                // Y축: 720 -> 1500 (약 2.08배) - 비율이 다름!
-                const xScale = window.outputWidth / 600;
-                const yScale = window.outputHeight / 720;
-                
-                // 오프셋 적용된 좌표
-                const sourceX = (detailRect.x + mode1State.detailOffsetX) * xScale;
-                const sourceY = (detailRect.y + mode1State.detailOffsetY) * yScale;
-                const sourceWidth = detailRect.width * xScale;
-                const sourceHeight = detailRect.height * yScale;
-                
-                if (sourceWidth > 0 && sourceHeight > 0) {
-                    // 원본 비율 계산
-                    const aspectRatio = detailRect.width / detailRect.height;
-                    
-                    // 원형 안에서 비율을 유지하면서 최대 크기 계산
-                    let drawWidth, drawHeight, drawX, drawY;
-                    
-                    if (aspectRatio > 1) {
-                        // 가로가 더 긴 경우
-                        drawWidth = zoomSize;
-                        drawHeight = zoomSize / aspectRatio;
-                        drawX = zoomX;
-                        drawY = zoomY + (zoomSize - drawHeight) / 2;
-                    } else {
-                        // 세로가 더 길거나 같은 경우
-                        drawHeight = zoomSize;
-                        drawWidth = zoomSize * aspectRatio;
-                        drawX = zoomX + (zoomSize - drawWidth) / 2;
-                        drawY = zoomY;
-                    }
-                    
-                    outputCtx.imageSmoothingEnabled = true;
-                    outputCtx.imageSmoothingQuality = 'high';
-                    outputCtx.drawImage(
-                        tempCanvas,
-                        sourceX,
-                        sourceY,
-                        sourceWidth,
-                        sourceHeight,
-                        drawX,
-                        drawY,
-                        drawWidth,
-                        drawHeight
-                    );
-                }
-                
-                outputCtx.restore();
-                
-                // 테두리
-                outputCtx.strokeStyle = '#e2e8f0';
-                outputCtx.lineWidth = 2;
-                outputCtx.beginPath();
-                outputCtx.arc(zoomX + zoomSize/2, zoomY + zoomSize/2, zoomSize/2, 0, Math.PI * 2);
-                outputCtx.stroke();
+            // 원본 이미지 사용 (통일된 참조)
+            const designImage = mode1State.originalImages.design || mode1State.design;
+            renderHighQuality(outputCtx, outputCanvas, tshirt.image, designImage);
+
+            // 저장 시 썸네일 추가 (미리보기와 동일하게)
+            if (originalThumbnailState) {
+                renderDetailThumbnailForSave(outputCanvas, outputCtx, tshirt.image, designImage);
             }
-            
+
             const blob = await new Promise(resolve => {
                 outputCanvas.toBlob(resolve, 'image/png', 1.0);
             });
@@ -764,13 +793,52 @@
             });
         }
         
+        mode1State.thumbnail.enabled = originalThumbnailState; // 썸네일 상태 복구
         await window.downloadZip(files, 'OKSTAR_Front_Output');
     };
     
-    // DOM 로드 시 초기화
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initMode1);
-    } else {
-        initMode1();
+    // 클린업 함수
+    function cleanupMode1() {
+        // 메모리 관리
+        if (window.TDesignUtils) {
+            // 모든 이벤트 리스너 제거
+            const canvas = document.getElementById('frontCanvas');
+            if (canvas) {
+                window.TDesignUtils.MemoryManager.removeEventListeners(canvas);
+            }
+            
+            // URL 정리
+            mode1State.objectURLs.forEach(url => URL.revokeObjectURL(url));
+            mode1State.objectURLs.clear();
+        }
+        
+        // 상태 초기화
+        mode1State.tshirts = [];
+        mode1State.design = null;
+        mode1State.originalImages = { design: null, tshirts: [] };
     }
+    
+    // 전역 노출
+    window.initMode1 = initMode1;
+    window.cleanupMode1 = cleanupMode1;
+    
+    // DOM 로드 시 초기화 - Mode 1이 기본 모드이므로 바로 초기화
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            // Mode 1이 활성화된 경우에만 초기화
+            const container = document.getElementById('frontMode');
+            if (container && container.classList.contains('active')) {
+                initMode1();
+            }
+        });
+    } else {
+        // 이미 DOM이 로드된 상태라면
+        const container = document.getElementById('frontMode');
+        if (container && container.classList.contains('active')) {
+            initMode1();
+        }
+    }
+    
+    // 페이지 언로드 시 정리
+    window.addEventListener('beforeunload', cleanupMode1);
 })();

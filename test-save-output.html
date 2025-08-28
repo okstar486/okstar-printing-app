@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>저장 출력 테스트</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .panel {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        canvas {
+            background: white;
+            border-radius: 5px;
+            max-width: 100%;
+            height: auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+        }
+        h2 {
+            margin: 0 0 15px 0;
+            color: #4ade80;
+        }
+        .info {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #a1a1aa;
+        }
+        .controls {
+            margin: 20px 0;
+            padding: 20px;
+            background: #2a2a2a;
+            border-radius: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #4ade80;
+            color: black;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #22c55e;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            background: #3a3a3a;
+            border-radius: 5px;
+            border-left: 4px solid #4ade80;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 저장 출력 비교 테스트</h1>
+        
+        <div class="controls">
+            <h3>테스트 설정</h3>
+            <button onclick="setupTestEnvironment()">1. 테스트 환경 설정</button>
+            <button onclick="loadTestImage()">2. 테스트 이미지 로드</button>
+            <button onclick="compareOutput()">3. 출력 비교</button>
+            <button onclick="saveTest()">4. 저장 테스트</button>
+            
+            <div class="status" id="status">테스트 준비 중...</div>
+        </div>
+        
+        <div class="comparison">
+            <div class="panel">
+                <h2>미리보기 (600x720)</h2>
+                <canvas id="previewCanvas" width="600" height="720"></canvas>
+                <div class="info" id="previewInfo">크기: 600x720</div>
+            </div>
+            
+            <div class="panel">
+                <h2>저장 출력 (1500x1800)</h2>
+                <canvas id="saveCanvas" width="1500" height="1800"></canvas>
+                <div class="info" id="saveInfo">크기: 1500x1800</div>
+            </div>
+        </div>
+        
+        <div id="debugInfo" style="background: #2a2a2a; padding: 20px; border-radius: 10px; margin-top: 20px;">
+            <h3>디버그 정보</h3>
+            <pre id="debugContent">대기 중...</pre>
+        </div>
+    </div>
+
+    <script>
+        // 전역 상태
+        window.appState = {
+            currentMode: 'front',
+            modes: {}
+        };
+        
+        window.outputWidth = 1500;
+        window.outputHeight = 1800;  // 5:6 비율 유지
+        
+        let testTshirt = null;
+        let testDesign = null;
+        
+        function updateStatus(msg, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = msg;
+            status.style.borderColor = type === 'error' ? '#ef4444' : 
+                                     type === 'success' ? '#4ade80' : '#3b82f6';
+        }
+        
+        function updateDebug(data) {
+            document.getElementById('debugContent').textContent = 
+                JSON.stringify(data, null, 2);
+        }
+        
+        function setupTestEnvironment() {
+            updateStatus('테스트 환경 설정 중...');
+            
+            // Mode 1 초기화를 위한 컨테이너 생성
+            const container = document.createElement('div');
+            container.id = 'frontMode';
+            container.className = 'active';
+            container.style.display = 'none';
+            document.body.appendChild(container);
+            
+            updateStatus('환경 설정 완료!', 'success');
+        }
+        
+        function loadTestImage() {
+            updateStatus('테스트 이미지 생성 중...');
+            
+            // 티셔츠 이미지 생성
+            const tshirtCanvas = document.createElement('canvas');
+            tshirtCanvas.width = 800;
+            tshirtCanvas.height = 1000;
+            const tCtx = tshirtCanvas.getContext('2d');
+            
+            // 베이지색 티셔츠 그리기
+            tCtx.fillStyle = '#d4c5a0';
+            tCtx.fillRect(100, 200, 600, 700);
+            
+            // 소매
+            tCtx.fillRect(50, 250, 100, 200);
+            tCtx.fillRect(650, 250, 100, 200);
+            
+            testTshirt = new Image();
+            testTshirt.onload = () => {
+                // 디자인 이미지 생성 (강아지 대신 간단한 로고)
+                const designCanvas = document.createElement('canvas');
+                designCanvas.width = 200;
+                designCanvas.height = 200;
+                const dCtx = designCanvas.getContext('2d');
+                
+                // 원형 로고
+                dCtx.fillStyle = '#4ade80';
+                dCtx.beginPath();
+                dCtx.arc(100, 100, 80, 0, Math.PI * 2);
+                dCtx.fill();
+                
+                dCtx.fillStyle = 'white';
+                dCtx.font = 'bold 48px sans-serif';
+                dCtx.textAlign = 'center';
+                dCtx.textBaseline = 'middle';
+                dCtx.fillText('OK', 100, 100);
+                
+                testDesign = new Image();
+                testDesign.onload = () => {
+                    updateStatus('테스트 이미지 로드 완료!', 'success');
+                    renderPreview();
+                };
+                testDesign.src = designCanvas.toDataURL();
+            };
+            testTshirt.src = tshirtCanvas.toDataURL();
+        }
+        
+        function renderPreview() {
+            const canvas = document.getElementById('previewCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            if (testTshirt && testDesign) {
+                // 티셔츠 그리기
+                const scale = Math.min(canvas.width / testTshirt.width, canvas.height / testTshirt.height) * 0.9;
+                const tWidth = testTshirt.width * scale;
+                const tHeight = testTshirt.height * scale;
+                const tX = (canvas.width - tWidth) / 2;
+                const tY = (canvas.height - tHeight) / 2;
+                
+                ctx.drawImage(testTshirt, tX, tY, tWidth, tHeight);
+                
+                // 디자인 그리기 (가슴 위치)
+                const designScale = 0.3;
+                const dWidth = testDesign.width * designScale;
+                const dHeight = testDesign.height * designScale;
+                const dX = tX + tWidth * 0.5 - dWidth / 2;
+                const dY = tY + tHeight * 0.4 - dHeight / 2;
+                
+                ctx.drawImage(testDesign, dX, dY, dWidth, dHeight);
+                
+                updateDebug({
+                    preview: {
+                        canvas: { width: canvas.width, height: canvas.height },
+                        tshirt: { x: tX, y: tY, width: tWidth, height: tHeight },
+                        design: { x: dX, y: dY, width: dWidth, height: dHeight },
+                        designPosition: { x: 0.5, y: 0.4 },
+                        designScale: designScale
+                    }
+                });
+            }
+        }
+        
+        function compareOutput() {
+            if (!testTshirt || !testDesign) {
+                updateStatus('먼저 테스트 이미지를 로드하세요!', 'error');
+                return;
+            }
+            
+            updateStatus('출력 비교 중...');
+            
+            const saveCanvas = document.getElementById('saveCanvas');
+            const saveCtx = saveCanvas.getContext('2d');
+            
+            saveCtx.clearRect(0, 0, saveCanvas.width, saveCanvas.height);
+            saveCtx.fillStyle = 'white';
+            saveCtx.fillRect(0, 0, saveCanvas.width, saveCanvas.height);
+            
+            // renderHighQuality와 동일한 로직 사용
+            const scale = Math.min(saveCanvas.width / testTshirt.width, saveCanvas.height / testTshirt.height) * 0.9;
+            const tWidth = testTshirt.width * scale;
+            const tHeight = testTshirt.height * scale;
+            const tX = (saveCanvas.width - tWidth) / 2;
+            const tY = (saveCanvas.height - tHeight) / 2;
+            
+            saveCtx.drawImage(testTshirt, tX, tY, tWidth, tHeight);
+            
+            // 디자인 위치 (동일한 비율 유지)
+            const designScale = 0.3;
+            const dWidth = testDesign.width * designScale;
+            const dHeight = testDesign.height * designScale;
+            const dX = tX + tWidth * 0.5 - dWidth / 2;
+            const dY = tY + tHeight * 0.4 - dHeight / 2;
+            
+            saveCtx.drawImage(testDesign, dX, dY, dWidth, dHeight);
+            
+            updateStatus('비교 완료! 두 이미지를 확인하세요.', 'success');
+        }
+        
+        function saveTest() {
+            const saveCanvas = document.getElementById('saveCanvas');
+            saveCanvas.toBlob((blob) => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'test_output.png';
+                a.click();
+                URL.revokeObjectURL(url);
+                updateStatus('저장 완료!', 'success');
+            });
+        }
+    </script>
+
+    <!-- 스크립트 로드 -->
+    <script src="utils.js"></script>
+    <script src="mode1-front.js"></script>
+</body>
+</html>

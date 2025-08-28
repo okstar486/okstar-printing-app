@@ -182,7 +182,7 @@
             margin-bottom: 15px;
         }
 
-        .upload-box input[type="file"] {
+        input[type="file"] {
             display: none;
         }
 
@@ -406,7 +406,8 @@
             padding: 20px;
             border-radius: 12px;
             border: 2px solid #10b981;
-            margin: 20px 0;
+            margin: 20px auto;
+            max-width: 600px;
         }
 
         .detail-control-section {
@@ -481,7 +482,7 @@
         <!-- 픽셀 크기 설정 -->
         <div style="text-align: center; margin: 15px 0;">
             <button id="pixelSizeBtn" style="padding: 8px 16px; background: #6366f1; color: white; border: none; border-radius: 6px; cursor: pointer;">
-                📐 출력 크기 변경 (현재: 1500px)
+                📐 출력 크기 변경 (현재: 1500x1800px)
             </button>
         </div>
 
@@ -521,9 +522,9 @@
 
     <!-- 전역 설정 및 상태 -->
     <script>
-        // 전역 설정
+        // 전역 설정 - 미리보기와 동일한 5:6 비율 유지
         window.outputWidth = 1500;
-        window.outputHeight = 1500;
+        window.outputHeight = 1800;  // 1500 * 1.2 = 1800 (600:720 = 5:6 비율)
         
         // 전역 상태 관리
         window.appState = {
@@ -542,6 +543,7 @@
             const height = prompt('세로 크기를 입력하세요 (px):', window.outputHeight);
             
             if (width && height && !isNaN(width) && !isNaN(height)) {
+                // TODO(human): 5:6 비율 유지 로직 구현
                 window.outputWidth = parseInt(width);
                 window.outputHeight = parseInt(height);
                 document.getElementById('pixelSizeBtn').textContent = 
@@ -639,7 +641,17 @@
             modeCards.forEach(card => {
                 card.addEventListener('click', () => {
                     const mode = card.dataset.mode;
+                    const previousMode = appState.currentMode;
                     appState.currentMode = mode;
+                    
+                    // 이전 모드 정리
+                    if (previousMode && window[`cleanupMode${previousMode.charAt(0).toUpperCase() + previousMode.slice(1)}`]) {
+                        try {
+                            window[`cleanupMode${previousMode.charAt(0).toUpperCase() + previousMode.slice(1)}`]();
+                        } catch (e) {
+                            console.warn('Cleanup failed for mode:', previousMode, e);
+                        }
+                    }
                     
                     // UI 업데이트
                     modeCards.forEach(c => c.classList.remove('active'));
@@ -650,6 +662,32 @@
                     
                     modeInstruction.textContent = instructions[mode];
                     window.updateFilenameHint(mode);
+                    
+                    // 해당 모드 초기화
+                    const initFunctionName = `initMode${mode.charAt(0).toUpperCase() + mode.slice(1)}`;
+                    if (mode === 'front') {
+                        // Mode 1: front
+                        if (window.initMode1) {
+                            window.initMode1();
+                        } else {
+                            console.error('initMode1 not found');
+                        }
+                    } else if (mode === 'frontback') {
+                        // Mode 2: frontback
+                        if (window.initMode2) {
+                            window.initMode2();
+                        }
+                    } else if (mode === 'combine') {
+                        // Mode 3: combine
+                        if (window.initMode3) {
+                            window.initMode3();
+                        }
+                    } else if (mode === 'colorchip') {
+                        // Mode 4: colorchip
+                        if (window.initMode4) {
+                            window.initMode4();
+                        }
+                    }
                     
                     // 저장 버튼 상태 업데이트
                     window.updateSaveButton();
@@ -667,9 +705,22 @@
         // 초기화
         document.addEventListener('DOMContentLoaded', () => {
             initModeSelector();
+            
+            // 기본 모드(Mode 1) 초기화
+            setTimeout(() => {
+                if (window.initMode1) {
+                    console.log('Initializing Mode 1...');
+                    window.initMode1();
+                } else {
+                    console.error('initMode1 function not found. Make sure mode1-front.js is loaded.');
+                }
+            }, 100); // 약간의 지연을 주어 모든 스크립트가 로드되도록 함
         });
     </script>
 
+    <!-- 유틸리티 로드 -->
+    <script src="utils.js"></script>
+    
     <!-- 컴포넌트 로드 -->
     <script src="mode1-front.js"></script>
     <script src="mode2-frontback.js"></script>

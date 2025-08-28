@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mode 1 Test - Debug</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        #frontMode {
+            border: 2px solid #3b82f6;
+            padding: 20px;
+            border-radius: 8px;
+            min-height: 400px;
+        }
+        .status {
+            background: #fef3c7;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Mode 1 초기화 테스트</h1>
+        
+        <div class="status" id="status">
+            초기화 대기 중...
+        </div>
+        
+        <button onclick="testInit()">Mode 1 초기화 실행</button>
+        <button onclick="checkElements()">엘리먼트 확인</button>
+        <button onclick="location.reload()">페이지 새로고침</button>
+        
+        <div id="frontMode" class="active">
+            <!-- Mode 1 content will be injected here -->
+        </div>
+        
+        <div class="status" id="console-log">
+            <h3>콘솔 로그:</h3>
+            <pre id="log-content"></pre>
+        </div>
+    </div>
+
+    <script>
+        // 전역 상태 생성
+        window.appState = {
+            currentMode: 'front',
+            modes: {}
+        };
+
+        // 콘솔 로그 캡처
+        const originalLog = console.log;
+        const originalError = console.error;
+        const logContent = document.getElementById('log-content');
+        
+        console.log = function() {
+            originalLog.apply(console, arguments);
+            logContent.textContent += Array.from(arguments).join(' ') + '\n';
+        };
+        
+        console.error = function() {
+            originalError.apply(console, arguments);
+            logContent.textContent += '[ERROR] ' + Array.from(arguments).join(' ') + '\n';
+        };
+
+        function updateStatus(message, type = '') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = 'status ' + type;
+        }
+
+        function testInit() {
+            updateStatus('초기화 시작...', '');
+            logContent.textContent = ''; // 로그 초기화
+            
+            try {
+                if (window.initMode1) {
+                    window.initMode1();
+                    updateStatus('초기화 함수 실행 완료!', 'success');
+                } else {
+                    updateStatus('initMode1 함수를 찾을 수 없습니다!', 'error');
+                }
+            } catch (e) {
+                updateStatus('초기화 중 오류 발생: ' + e.message, 'error');
+                console.error(e);
+            }
+        }
+
+        function checkElements() {
+            const container = document.getElementById('frontMode');
+            const canvas = document.getElementById('frontCanvas');
+            const tshirtInput = document.getElementById('frontTshirtInput');
+            const designInput = document.getElementById('frontDesignInput');
+            const uploadSection = container ? container.querySelector('.upload-section') : null;
+            
+            console.log('=== 엘리먼트 체크 ===');
+            console.log('Container:', !!container);
+            console.log('Canvas:', !!canvas);
+            console.log('T-shirt Input:', !!tshirtInput);
+            console.log('Design Input:', !!designInput);
+            console.log('Upload Section:', !!uploadSection);
+            
+            if (container) {
+                console.log('Container children:', container.children.length);
+                console.log('Container HTML length:', container.innerHTML.length);
+            }
+        }
+
+        // 스크립트 로드 상태 확인
+        window.addEventListener('DOMContentLoaded', () => {
+            updateStatus('DOM 로드 완료, 스크립트 로딩 중...', '');
+        });
+    </script>
+
+    <!-- 유틸리티 로드 -->
+    <script src="utils.js"></script>
+    
+    <!-- Mode 1 컴포넌트 로드 -->
+    <script src="mode1-front.js"></script>
+    
+    <script>
+        // 스크립트 로드 완료 확인
+        setTimeout(() => {
+            if (window.initMode1) {
+                updateStatus('Mode 1 스크립트 로드 완료! 초기화 버튼을 클릭하세요.', 'success');
+                console.log('initMode1 function is available');
+            } else {
+                updateStatus('Mode 1 스크립트 로드 실패!', 'error');
+                console.error('initMode1 function not found');
+            }
+        }, 500);
+    </script>
+</body>
+</html>

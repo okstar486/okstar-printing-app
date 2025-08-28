@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Syntax Verification</title>
+    <style>
+        body { 
+            font-family: monospace; 
+            padding: 20px; 
+            background: #1e1e1e; 
+            color: #d4d4d4; 
+        }
+        .success { color: #4ec9b0; }
+        .error { color: #f48771; }
+        .info { color: #9cdcfe; }
+        pre { 
+            background: #2d2d2d; 
+            padding: 10px; 
+            border-radius: 5px; 
+            overflow-x: auto; 
+        }
+    </style>
+</head>
+<body>
+    <h1>Mode1-Front.js 문법 검증</h1>
+    <div id="status"></div>
+    <pre id="log"></pre>
+
+    <script>
+        const log = document.getElementById('log');
+        const status = document.getElementById('status');
+        
+        function addLog(message, type = 'info') {
+            const span = document.createElement('div');
+            span.className = type;
+            span.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.appendChild(span);
+        }
+        
+        // 전역 상태 초기화
+        window.appState = {
+            currentMode: 'front',
+            modes: {}
+        };
+        
+        addLog('전역 상태 초기화 완료', 'success');
+        
+        // 에러 캐처
+        window.addEventListener('error', (e) => {
+            addLog(`ERROR: ${e.message} at line ${e.lineno}`, 'error');
+            status.innerHTML = '<span class="error">❌ 스크립트 로드 실패!</span>';
+            return true;
+        });
+        
+        addLog('utils.js 로딩 중...', 'info');
+    </script>
+    
+    <!-- utils.js 로드 -->
+    <script src="utils.js" onload="addLog('utils.js 로드 성공', 'success')" 
+            onerror="addLog('utils.js 로드 실패!', 'error')"></script>
+    
+    <script>
+        addLog('mode1-front.js 로딩 중...', 'info');
+    </script>
+    
+    <!-- mode1-front.js 로드 -->
+    <script src="mode1-front.js" onload="addLog('mode1-front.js 로드 성공', 'success')" 
+            onerror="addLog('mode1-front.js 로드 실패!', 'error')"></script>
+    
+    <script>
+        // 최종 검증
+        setTimeout(() => {
+            if (window.initMode1) {
+                addLog('✅ initMode1 함수 확인됨', 'success');
+                addLog('✅ cleanupMode1 함수 확인됨: ' + (typeof window.cleanupMode1 === 'function'), 'success');
+                status.innerHTML = '<span class="success">✅ 모든 스크립트가 정상적으로 로드되었습니다!</span>';
+                
+                // Mode 1 초기화 가능 여부 테스트
+                const testDiv = document.createElement('div');
+                testDiv.id = 'frontMode';
+                testDiv.className = 'active';
+                testDiv.style.display = 'none';
+                document.body.appendChild(testDiv);
+                
+                try {
+                    addLog('Mode 1 초기화 테스트...', 'info');
+                    window.initMode1();
+                    addLog('✅ Mode 1 초기화 성공!', 'success');
+                } catch (e) {
+                    addLog(`Mode 1 초기화 오류: ${e.message}`, 'error');
+                }
+            } else {
+                addLog('❌ initMode1 함수를 찾을 수 없음', 'error');
+                status.innerHTML = '<span class="error">❌ 스크립트 로드는 성공했지만 함수를 찾을 수 없습니다</span>';
+            }
+        }, 100);
+    </script>
+</body>
+</html>
