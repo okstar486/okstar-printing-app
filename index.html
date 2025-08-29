@@ -482,7 +482,7 @@
         <!-- 픽셀 크기 설정 -->
         <div style="text-align: center; margin: 15px 0;">
             <button id="pixelSizeBtn" style="padding: 8px 16px; background: #6366f1; color: white; border: none; border-radius: 6px; cursor: pointer;">
-                📐 출력 크기 변경 (현재: 1500x1800px)
+                📐 출력 크기 변경 (현재: 1500x1500px)
             </button>
         </div>
 
@@ -522,9 +522,9 @@
 
     <!-- 전역 설정 및 상태 -->
     <script>
-        // 전역 설정 - 미리보기와 동일한 5:6 비율 유지
+        // 전역 설정
         window.outputWidth = 1500;
-        window.outputHeight = 1800;  // 1500 * 1.2 = 1800 (600:720 = 5:6 비율)
+        window.outputHeight = 1500;  // 정사각형 유지
         
         // 전역 상태 관리
         window.appState = {

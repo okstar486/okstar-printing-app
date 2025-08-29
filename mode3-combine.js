@@ -27,7 +27,10 @@
         // 디테일 영역 독립 제어
         detailAreaCenter: { x: 400, y: 400 },
         detailOffsetX: 0,
-        detailOffsetY: 0
+        detailOffsetY: 0,
+        
+        // Magic Wand 모드
+        magicWandMode: false
     };
     
     // HTML 템플릿
@@ -99,6 +102,12 @@
                 <span style="margin-left: 20px;">감도:</span>
                 <input type="range" id="bgRemoveSensitivity" min="10" max="50" value="30" style="width: 100px; vertical-align: middle;">
                 <span id="bgSensitivityValue" style="margin-left: 5px;">30</span>
+                <button id="magicWandBtn" style="margin-left: 15px; padding: 5px 10px; background: #10b981; color: white; border: none; border-radius: 5px; cursor: pointer; display: none;">
+                    🪄 클릭하여 배경 선택
+                </button>
+                <button id="resetBgBtn" style="margin-left: 5px; padding: 5px 10px; background: #ef4444; color: white; border: none; border-radius: 5px; cursor: pointer; display: none;">
+                    ↻ 원본
+                </button>
             </div>
         </div>
 
@@ -407,13 +416,96 @@
         // 배경 제거
         document.getElementById('removeBackground').addEventListener('change', (e) => {
             mode3State.removeBackground = e.target.checked;
+            
+            // Magic Wand 버튼 표시/숨기기
+            const magicWandBtn = document.getElementById('magicWandBtn');
+            const resetBtn = document.getElementById('resetBgBtn');
+            if (e.target.checked) {
+                magicWandBtn.style.display = 'inline-block';
+                resetBtn.style.display = 'inline-block';
+            } else {
+                magicWandBtn.style.display = 'none';
+                resetBtn.style.display = 'none';
+            }
+            
             renderCombine(canvas, ctx);
         });
         
-        document.getElementById('bgRemoveSensitivity').addEventListener('input', (e) => {
+        document.getElementById('bgRemoveSensitivity').addEventListener('input', async (e) => {
             mode3State.bgSensitivity = parseInt(e.target.value);
             document.getElementById('bgSensitivityValue').textContent = e.target.value;
-            renderCombine(canvas, ctx);
+            
+            // 자동 흰색 배경 제거 적용
+            if (mode3State.removeBackground && mode3State.frontImages[mode3State.currentIndex]) {
+                const tolerance = mode3State.bgSensitivity;
+                const frontImg = mode3State.frontImages[mode3State.currentIndex];
+                
+                // 원본 이미지 백업
+                if (!frontImg.originalImage) {
+                    frontImg.originalImage = frontImg.image;
+                }
+                
+                // 흰색 배경 제거 적용 (Promise 대기)
+                frontImg.processedImage = await removeWhiteBackground(frontImg.originalImage, tolerance);
+                renderCombine(canvas, ctx);
+            }
+        });
+        
+        // Magic Wand 버튼 클릭
+        document.getElementById('magicWandBtn').addEventListener('click', () => {
+            mode3State.magicWandMode = true;
+            const canvas = document.getElementById('combineCanvas');
+            canvas.style.cursor = 'crosshair';
+            alert('클릭하여 제거할 배경 색상을 선택하세요.');
+        });
+        
+        // 원본 복구 버튼
+        document.getElementById('resetBgBtn').addEventListener('click', () => {
+            const frontImg = mode3State.frontImages[mode3State.currentIndex];
+            if (frontImg && frontImg.originalImage) {
+                frontImg.processedImage = null;
+                renderCombine(canvas, ctx);
+            }
+        });
+        
+        // 캔버스 클릭 이벤트 (Magic Wand)
+        canvas.addEventListener('click', async (e) => {
+            if (!mode3State.magicWandMode || !mode3State.removeBackground) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const frontImg = mode3State.frontImages[mode3State.currentIndex];
+            if (!frontImg) return;
+            
+            // 원본 이미지 백업
+            if (!frontImg.originalImage) {
+                frontImg.originalImage = frontImg.image;
+            }
+            
+            // 이미지 상의 실제 클릭 좌표 계산
+            const currentSet = initializeSet(mode3State.currentIndex);
+            const imgScale = currentSet.frontScale * 0.5;
+            const imgWidth = frontImg.originalImage.width * imgScale;
+            const imgHeight = frontImg.originalImage.height * imgScale;
+            const imgX = currentSet.frontPosition.x - imgWidth / 2;
+            const imgY = currentSet.frontPosition.y - imgHeight / 2;
+            
+            // 이미지 범위 내 클릭인지 확인
+            if (x >= imgX && x <= imgX + imgWidth && y >= imgY && y <= imgY + imgHeight) {
+                // 원본 이미지 좌표로 변환
+                const origX = Math.floor((x - imgX) / imgScale);
+                const origY = Math.floor((y - imgY) / imgScale);
+                
+                // Magic Wand 적용 (Promise 대기)
+                const tolerance = mode3State.bgSensitivity;
+                frontImg.processedImage = await applyMagicWand(frontImg.originalImage, origX, origY, tolerance);
+                renderCombine(canvas, ctx);
+            }
+            
+            mode3State.magicWandMode = false;
+            canvas.style.cursor = 'default';
         });
         
         // 디테일 확대
@@ -635,12 +727,16 @@
         }
         
         // 레이어 순서대로 그리기
+        // 처리된 이미지가 있으면 사용, 없으면 원본 사용
+        const frontImageToUse = frontImg.processedImage || frontImg.image;
+        const backImageToUse = backImg.image;
+        
         if (currentSet.layerOrder === 'front') {
-            drawImage(ctx, backImg.image, currentSet.backPosition, currentSet.backScale, currentSet.opacity);
-            drawImage(ctx, frontImg.image, currentSet.frontPosition, currentSet.frontScale, currentSet.opacity);
+            drawImage(ctx, backImageToUse, currentSet.backPosition, currentSet.backScale, currentSet.opacity);
+            drawImage(ctx, frontImageToUse, currentSet.frontPosition, currentSet.frontScale, currentSet.opacity);
         } else {
-            drawImage(ctx, frontImg.image, currentSet.frontPosition, currentSet.frontScale, currentSet.opacity);
-            drawImage(ctx, backImg.image, currentSet.backPosition, currentSet.backScale, currentSet.opacity);
+            drawImage(ctx, frontImageToUse, currentSet.frontPosition, currentSet.frontScale, currentSet.opacity);
+            drawImage(ctx, backImageToUse, currentSet.backPosition, currentSet.backScale, currentSet.opacity);
         }
         
         // 디테일 확대 표시
@@ -700,6 +796,111 @@
         
         ctx.drawImage(image, x, y, width, height);
         ctx.restore();
+    }
+    
+    // Magic Wand 배경 제거 함수들
+    async function applyMagicWand(image, clickX, clickY, tolerance) {
+        // 임시 캔버스 생성
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = image.width;
+        tempCanvas.height = image.height;
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        // 이미지 그리기
+        tempCtx.drawImage(image, 0, 0);
+        
+        // 이미지 데이터 가져오기
+        const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+        const data = imageData.data;
+        
+        // 클릭한 픽셀의 색상 가져오기
+        const targetIndex = (clickY * tempCanvas.width + clickX) * 4;
+        const targetR = data[targetIndex];
+        const targetG = data[targetIndex + 1];
+        const targetB = data[targetIndex + 2];
+        
+        // Flood Fill 알고리즘 구현
+        const visited = new Set();
+        const stack = [[clickX, clickY]];
+        
+        // TODO(human): Flood Fill 알고리즘 구현
+        // 스택을 사용한 반복적 접근으로 인접 픽셀 탐색
+        // tolerance 범위 내의 색상을 가진 픽셀을 투명하게 처리
+        
+        while (stack.length > 0) {
+            const [x, y] = stack.pop();
+            const key = `${x},${y}`;
+            
+            if (visited.has(key)) continue;
+            if (x < 0 || x >= tempCanvas.width || y < 0 || y >= tempCanvas.height) continue;
+            
+            visited.add(key);
+            
+            const idx = (y * tempCanvas.width + x) * 4;
+            const r = data[idx];
+            const g = data[idx + 1];
+            const b = data[idx + 2];
+            
+            // 색상 차이 계산
+            const diff = Math.abs(r - targetR) + Math.abs(g - targetG) + Math.abs(b - targetB);
+            
+            if (diff <= tolerance * 3) {
+                // 투명하게 만들기
+                data[idx + 3] = 0;
+                
+                // 인접 픽셀 추가
+                stack.push([x + 1, y]);
+                stack.push([x - 1, y]);
+                stack.push([x, y + 1]);
+                stack.push([x, y - 1]);
+            }
+        }
+        
+        // 수정된 이미지 데이터 적용
+        tempCtx.putImageData(imageData, 0, 0);
+        
+        // 새 이미지로 반환 (Promise로 로드 보장)
+        const newImage = new Image();
+        return new Promise((resolve) => {
+            newImage.onload = () => resolve(newImage);
+            newImage.src = tempCanvas.toDataURL();
+        });
+    }
+    
+    // 전체 배경 제거 (흰색 기준)
+    async function removeWhiteBackground(image, tolerance) {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = image.width;
+        tempCanvas.height = image.height;
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        tempCtx.drawImage(image, 0, 0);
+        
+        const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+        const data = imageData.data;
+        
+        // 흰색에 가까운 픽셀 투명하게
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            
+            // 흰색과의 차이 계산
+            const diff = Math.abs(r - 255) + Math.abs(g - 255) + Math.abs(b - 255);
+            
+            if (diff <= tolerance * 3) {
+                data[i + 3] = 0; // 알파 채널을 0으로
+            }
+        }
+        
+        tempCtx.putImageData(imageData, 0, 0);
+        
+        // 새 이미지로 반환 (Promise로 로드 보장)
+        const newImage = new Image();
+        return new Promise((resolve) => {
+            newImage.onload = () => resolve(newImage);
+            newImage.src = tempCanvas.toDataURL();
+        });
     }
     
     // 탭 업데이트
@@ -819,21 +1020,38 @@
             
             const scaleRatio = window.outputWidth / 800;
             
-            // 레이어 순서대로 그리기
-            if (currentSet.layerOrder === 'front') {
-                drawToCanvas(saveCtx, backImg.image, currentSet.backPosition, currentSet.backScale, scaleRatio);
-                drawToCanvas(saveCtx, frontImg.image, currentSet.frontPosition, currentSet.frontScale, scaleRatio);
-            } else {
-                drawToCanvas(saveCtx, frontImg.image, currentSet.frontPosition, currentSet.frontScale, scaleRatio);
-                drawToCanvas(saveCtx, backImg.image, currentSet.backPosition, currentSet.backScale, scaleRatio);
+            // 처리된 이미지가 있으면 사용, 없으면 원본 사용
+            const frontImageToUse = frontImg.processedImage || frontImg.image;
+            const backImageToUse = backImg.image;
+            
+            // 이미지 로드 대기
+            const waitForImages = [];
+            
+            if (frontImg.processedImage && !frontImg.processedImage.complete) {
+                waitForImages.push(new Promise(resolve => {
+                    frontImg.processedImage.onload = resolve;
+                    frontImg.processedImage.onerror = resolve;
+                }));
             }
             
-            // 배경 제거
-            if (mode3State.removeBackground) {
-                const imageData = saveCtx.getImageData(0, 0, saveCanvas.width, saveCanvas.height);
-                const processedData = removeWhiteBackground(imageData, mode3State.bgSensitivity);
-                saveCtx.putImageData(processedData, 0, 0);
+            // 모든 이미지 로드 대기
+            if (waitForImages.length > 0) {
+                await Promise.all(waitForImages);
             }
+            
+            // 레이어 순서대로 그리기
+            if (currentSet.layerOrder === 'front') {
+                drawToCanvas(saveCtx, backImageToUse, currentSet.backPosition, currentSet.backScale, scaleRatio);
+                if (frontImageToUse.complete || !frontImg.processedImage) {
+                    drawToCanvas(saveCtx, frontImageToUse, currentSet.frontPosition, currentSet.frontScale, scaleRatio);
+                }
+            } else {
+                if (frontImageToUse.complete || !frontImg.processedImage) {
+                    drawToCanvas(saveCtx, frontImageToUse, currentSet.frontPosition, currentSet.frontScale, scaleRatio);
+                }
+                drawToCanvas(saveCtx, backImageToUse, currentSet.backPosition, currentSet.backScale, scaleRatio);
+            }
+            // 배경 제거는 이미 processedImage에 적용되어 있음
             
             // 디테일 확대
             if (mode3State.addDetailZoom && currentSet.detailAreaCenter) {

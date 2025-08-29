@@ -149,16 +149,17 @@
         if (!designImg || !tshirtDrawParams) return null;
         
         // 티셔츠 크기에 비례하여 디자인 크기 조정
-        // 기준: 600px 너비 캔버스에서 티셔츠 너비가 약 518px일 때를 기준으로 함
-        const baseCanvasWidth = 600;
-        const scaleFactor = tshirtDrawParams.width / (518.4 * (tshirtDrawParams.width / 518.4));
+        // 미리보기(600x720)에서의 기준 티셔츠 너비
+        const basePreviewTshirtWidth = 518.4;  // 600 * 0.9 * (tshirt 비율)
         
-        // 캔버스 크기에 따른 비례 조정
-        const canvasScaleFactor = tshirtDrawParams.width / 518.4; // 기준 티셔츠 너비 대비 현재 티셔츠 너비
+        // 현재 티셔츠 너비와 기준 너비의 비율
+        const scaleFactor = tshirtDrawParams.width / basePreviewTshirtWidth;
         
-        const designWidth = designImg.width * designScale * canvasScaleFactor;
-        const designHeight = designImg.height * designScale * canvasScaleFactor;
+        // 디자인 크기를 티셔츠 크기에 비례하여 조정
+        const designWidth = designImg.width * designScale * scaleFactor;
+        const designHeight = designImg.height * designScale * scaleFactor;
         
+        // 위치 계산 (상대 위치 사용)
         const absX = tshirtDrawParams.x + relPosition.x * tshirtDrawParams.width;
         const absY = tshirtDrawParams.y + relPosition.y * tshirtDrawParams.height;
 
