@@ -14,12 +14,21 @@
         mainDesignLocked: false,
         thumbnail: {
             enabled: true,
-            position: { x: 0.8, y: 0.2 }, // 정규화된 위치 (0-1)
+            position: { x: 0.97, y: 0.98 }, // 기본값 X:97% Y:98%로 변경
             zoomLevel: 3,
             size: 150,
             minSize: 100,
             maxSize: 300,
-            border: 3
+            border: 3,
+            fixedPosition: true // 위치 고정 여부
+        },
+        // 위치 프리셋 시스템
+        positionPresets: {
+            chest_center: { x: 0.5, y: 0.4, scale: 0.3 },
+            chest_left: { x: 0.3, y: 0.35, scale: 0.15 },
+            chest_right: { x: 0.7, y: 0.35, scale: 0.15 },
+            center_large: { x: 0.5, y: 0.5, scale: 0.5 },
+            pocket: { x: 0.25, y: 0.3, scale: 0.1 }
         },
         // 원본 이미지 하나로 통일
         originalImages: {
@@ -78,7 +87,7 @@
                 <div class="controls">
                     <div class="control-group">
                         <span class="control-label">크기:</span>
-                        <input type="range" id="frontScale" min="5" max="200" value="30">
+                        <input type="range" id="frontScale" min="1" max="200" value="30" step="0.5">
                         <span class="scale-value" id="frontScaleValue">30%</span>
                     </div>
                     <div class="control-group">
@@ -86,6 +95,17 @@
                             <input type="checkbox" id="mainDesignLock" style="margin-right: 5px;">
                             메인 디자인 위치 고정
                         </label>
+                    </div>
+                    <div class="control-group">
+                        <label style="font-weight: bold;">위치 프리셋:</label>
+                        <select id="positionPreset" style="padding: 5px; border: 1px solid #ddd; border-radius: 3px; margin-left: 10px;">
+                            <option value="">수동 조절</option>
+                            <option value="chest_center">가슴 중앙 (기본)</option>
+                            <option value="chest_left">왼쪽 가슴</option>
+                            <option value="chest_right">오른쪽 가슴</option>
+                            <option value="center_large">중앙 (크게)</option>
+                            <option value="pocket">포켓 위치</option>
+                        </select>
                     </div>
                 </div>
             </div>
@@ -104,8 +124,8 @@
                 </div>
                 <div class="control-group">
                     <span class="control-label">확대 배율:</span>
-                    <input type="range" id="thumbnailZoom" min="2" max="8" value="3">
-                    <span class="scale-value" id="thumbnailZoomValue">3x</span>
+                    <input type="range" id="thumbnailZoom" min="1" max="10" value="3" step="0.1">
+                    <span class="scale-value" id="thumbnailZoomValue">3.0x</span>
                 </div>
                 <div class="control-group">
                     <span class="control-label">썸네일 크기:</span>
@@ -116,19 +136,27 @@
             <div class="detail-control-section">
                 <div class="detail-control-title">📍 썸네일 위치</div>
                 <div class="control-group">
-                    <span class="control-label">가로:</span>
-                    <input type="range" id="thumbnailPosX" min="0" max="100" value="80">
-                    <span class="scale-value" id="thumbnailPosXValue">80%</span>
+                    <label style="font-weight: bold;">
+                        <input type="checkbox" id="thumbnailFixedPosition" checked style="margin-right: 5px;">
+                        고정 위치 (X:97% Y:98%)
+                    </label>
                 </div>
-                <div class="control-group">
-                    <span class="control-label">세로:</span>
-                    <input type="range" id="thumbnailPosY" min="0" max="100" value="20">
-                    <span class="scale-value" id="thumbnailPosYValue">20%</span>
-                </div>
-                <div style="text-align: center; margin-top: 10px;">
-                    <button id="thumbnailReset" style="padding: 5px 10px; background: #6366f1; color: white; border: none; border-radius: 5px; cursor: pointer;">
-                        ↻ 위치 초기화
-                    </button>
+                <div id="thumbnailPositionControls" style="display: none;">
+                    <div class="control-group">
+                        <span class="control-label">가로:</span>
+                        <input type="range" id="thumbnailPosX" min="0" max="100" value="97">
+                        <span class="scale-value" id="thumbnailPosXValue">97%</span>
+                    </div>
+                    <div class="control-group">
+                        <span class="control-label">세로:</span>
+                        <input type="range" id="thumbnailPosY" min="0" max="100" value="98">
+                        <span class="scale-value" id="thumbnailPosYValue">98%</span>
+                    </div>
+                    <div style="text-align: center; margin-top: 10px;">
+                        <button id="thumbnailReset" style="padding: 5px 10px; background: #6366f1; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                            ↻ 위치 초기화 (97%, 98%)
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -328,6 +356,23 @@
             canvas.style.cursor = e.target.checked ? 'default' : 'move';
         });
 
+        // 위치 프리셋 컨트롤
+        document.getElementById('positionPreset').addEventListener('change', (e) => {
+            const presetName = e.target.value;
+            if (presetName && mode1State.positionPresets[presetName]) {
+                const preset = mode1State.positionPresets[presetName];
+                mode1State.designPosition.x = preset.x;
+                mode1State.designPosition.y = preset.y;
+                mode1State.designScale = preset.scale;
+                
+                // UI 업데이트
+                document.getElementById('frontScale').value = preset.scale * 100;
+                document.getElementById('frontScaleValue').textContent = (preset.scale * 100) + '%';
+                
+                renderFront(canvas, ctx);
+            }
+        });
+
         // 썸네일 컨트롤
         document.getElementById('thumbnailToggle').addEventListener('change', (e) => {
             mode1State.thumbnail.enabled = e.target.checked;
@@ -335,8 +380,24 @@
         });
 
         document.getElementById('thumbnailZoom').addEventListener('input', (e) => {
-            mode1State.thumbnail.zoomLevel = parseInt(e.target.value);
-            document.getElementById('thumbnailZoomValue').textContent = e.target.value + 'x';
+            mode1State.thumbnail.zoomLevel = parseFloat(e.target.value);
+            document.getElementById('thumbnailZoomValue').textContent = parseFloat(e.target.value).toFixed(1) + 'x';
+            renderFront(canvas, ctx);
+        });
+
+        // 썸네일 위치 고정 체크박스
+        document.getElementById('thumbnailFixedPosition').addEventListener('change', (e) => {
+            mode1State.thumbnail.fixedPosition = e.target.checked;
+            const controls = document.getElementById('thumbnailPositionControls');
+            
+            if (e.target.checked) {
+                // 고정 위치로 설정
+                mode1State.thumbnail.position = { x: 0.97, y: 0.98 };
+                controls.style.display = 'none';
+            } else {
+                // 수동 조절 가능
+                controls.style.display = 'block';
+            }
             renderFront(canvas, ctx);
         });
 
@@ -364,12 +425,12 @@
 
         // 위치 초기화 버튼
         document.getElementById('thumbnailReset').addEventListener('click', () => {
-            mode1State.thumbnail.position = { x: 0.8, y: 0.2 };
+            mode1State.thumbnail.position = { x: 0.97, y: 0.98 };
             mode1State.thumbnail.size = 150;
-            document.getElementById('thumbnailPosX').value = 80;
-            document.getElementById('thumbnailPosY').value = 20;
-            document.getElementById('thumbnailPosXValue').textContent = '80%';
-            document.getElementById('thumbnailPosYValue').textContent = '20%';
+            document.getElementById('thumbnailPosX').value = 97;
+            document.getElementById('thumbnailPosY').value = 98;
+            document.getElementById('thumbnailPosXValue').textContent = '97%';
+            document.getElementById('thumbnailPosYValue').textContent = '98%';
             document.getElementById('thumbnailSize').value = 150;
             document.getElementById('thumbnailSizeValue').textContent = '150px';
             renderFront(canvas, ctx);
@@ -788,14 +849,22 @@
                 outputCanvas.toBlob(resolve, 'image/png', 1.0);
             });
             
+            // 사용자 입력 파일명 사용
+            const userFilename = document.getElementById('filenameInput')?.value || 'okstar';
+            const cleanFilename = userFilename.replace(/[^a-zA-Z0-9가-힣_-]/g, ''); // 안전한 파일명
+            
             files.push({
-                name: `${tshirt.name}_front_OKSTAR.png`,
+                name: `${cleanFilename}_${tshirt.name}_front.png`,
                 blob
             });
         }
         
         mode1State.thumbnail.enabled = originalThumbnailState; // 썸네일 상태 복구
-        await window.downloadZip(files, 'OKSTAR_Front_Output');
+        
+        // 사용자 입력 파일명을 ZIP 폴더명에도 사용
+        const userFilename = document.getElementById('filenameInput')?.value || 'okstar';
+        const cleanFilename = userFilename.replace(/[^a-zA-Z0-9가-힣_-]/g, '');
+        await window.downloadZip(files, `${cleanFilename}_Front_Output`);
     };
     
     // 클린업 함수
